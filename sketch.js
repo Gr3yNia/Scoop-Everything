@@ -1,3 +1,5 @@
+// Scoop Everything
+// Mobile motion interaction experiment
 let sensorsEnabled = false;
 let button;
 
@@ -5,7 +7,7 @@ let button;
 let scoops = [];
 let readyToScoop = true;
 
-// Based on your tests:
+// Based on tests:
 // scoop X was roughly -0.8 to -1.4
 let scoopTrigger = -0.7;
 
@@ -62,7 +64,7 @@ function draw() {
   // DETECT SCOOP
   // -------------------------
 
-  // Your scoop tests were around
+  // Scoop tests were around
   // X = -0.8 to -1.4
   if (
     rotationX < scoopTrigger &&
