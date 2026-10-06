@@ -1,7 +1,16 @@
 // Scoop Everything
 // Mobile motion interaction experiment
-let sensorsEnabled = false;
+
+// Permission now comes from p5-phone as window.sensorsEnabled.
+// Do NOT redeclare `sensorsEnabled` here: a top-level `let` would shadow
+// p5-phone's flag and sit at false forever.
 let button;
+
+// STEP 3 — TEMPORARY DEBUG
+// Remove this whole block once the scoop gesture is reliable.
+let trackedFingerId = null;
+let fingerHeld = false;
+let touchesWereEmpty = true;
 
 // SCOOP SETTINGS
 let scoops = [];
@@ -23,6 +32,9 @@ function setup() {
 
   button = createButton("Enable Motion Sensors");
 
+  // p5-phone binds the permission request to this element
+  button.id("enable-sensors");
+
   button.position(
     width / 2 - 90,
     height / 2 - 25
@@ -30,7 +42,9 @@ function setup() {
 
   button.size(180, 50);
 
-  button.mousePressed(enableSensors);
+  enableSensorOn("#enable-sensors");
+
+  lockGestures();
 }
 
 
@@ -43,7 +57,7 @@ function draw() {
   // BEFORE SENSOR PERMISSION
   // -------------------------
 
-  if (!sensorsEnabled) {
+  if (!window.sensorsEnabled) {
 
     fill(20);
     noStroke();
@@ -60,15 +74,35 @@ function draw() {
   }
 
 
+  // enableSensorOn leaves the element on the
+  // page, so hide it once permission is granted
+  if (button) {
+    button.hide();
+  }
+
+
+  // -------------------------
+  // STEP 3 — TEMPORARY DEBUG
+  // -------------------------
+
+  updateFinger();
+
+
   // -------------------------
   // DETECT SCOOP
   // -------------------------
 
   // Scoop tests were around
   // X = -0.8 to -1.4
+  //
+  // STEP 4: the held finger now gates this —
+  // tilting with no finger down does nothing.
+  // It still fires on the way DOWN; the full
+  // arc arrives in Step 6.
   if (
     rotationX < scoopTrigger &&
     readyToScoop &&
+    fingerHeld &&
     scoops.length < 4
   ) {
 
@@ -174,6 +208,10 @@ function draw() {
     );
 
   }
+
+
+  // STEP 3 — TEMPORARY DEBUG
+  drawDebugReadout();
 }
 
 
@@ -205,52 +243,85 @@ function addScoop() {
 
 
 // -------------------------
-// SENSOR PERMISSION
-// KEEP THIS SECTION
+// STEP 3 — TEMPORARY DEBUG
+// Finger tracking + readout.
+// Remove this whole block once the
+// scoop gesture is reliable.
 // -------------------------
 
-function enableSensors() {
+function updateFinger() {
 
-  if (
-    typeof DeviceOrientationEvent !== "undefined" &&
-    typeof DeviceOrientationEvent.requestPermission === "function"
-  ) {
+  let empty = touches.length === 0;
 
-    DeviceOrientationEvent.requestPermission()
+  if (trackedFingerId === null) {
 
-      .then(function(response) {
-
-        if (response === "granted") {
-
-          sensorsEnabled = true;
-
-          button.remove();
-
-        } else {
-
-          alert(
-            "Motion sensor permission was not granted."
-          );
-
-        }
-
-      })
-
-      .catch(function(error) {
-
-        alert(
-          "Sensor error: " + error
-        );
-
-      });
+    // Start an attempt only on a NEW touch
+    // (0 -> 1). A second finger landing while
+    // one is already down is ignored, and a
+    // finger that is already down is never
+    // adopted as the tracked one.
+    if (!empty && touchesWereEmpty) {
+      trackedFingerId = touches[0].id;
+    }
 
   } else {
 
-    sensorsEnabled = true;
+    // Only the tracked finger can end the
+    // attempt. Another finger lifting does not.
+    let stillDown = false;
 
-    button.remove();
+    for (let i = 0; i < touches.length; i++) {
+      if (touches[i].id === trackedFingerId) {
+        stillDown = true;
+        break;
+      }
+    }
 
+    if (!stillDown) {
+      trackedFingerId = null;
+    }
   }
+
+  fingerHeld = trackedFingerId !== null;
+  touchesWereEmpty = empty;
+}
+
+
+function mousePressed() {
+  updateFinger();
+  return false; // let p5-phone manage the touch
+}
+
+
+function mouseReleased() {
+  updateFinger();
+  return false;
+}
+
+
+function drawDebugReadout() {
+
+  // TEMPORARY — delete once the gesture works
+  fill(20);
+  noStroke();
+  textSize(12);
+  textAlign(LEFT, TOP);
+
+  text(
+    "rotationX " + rotationX.toFixed(2),
+    12,
+    12
+  );
+
+  text(
+    "finger " + (fingerHeld ? "down" : "up") +
+      "  id " + (trackedFingerId === null ? "-" : trackedFingerId),
+    12,
+    30
+  );
+
+  // put the main text back
+  textAlign(CENTER, CENTER);
 }
 
 
