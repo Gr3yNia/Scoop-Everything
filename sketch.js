@@ -14,7 +14,6 @@ let touchesWereEmpty = true;
 
 // SCOOP SETTINGS
 let scoops = [];
-let readyToScoop = true;
 
 // Based on tests:
 // scoop X was roughly -0.8 to -1.4
@@ -23,6 +22,30 @@ let scoopTrigger = -0.7;
 // Phone must come back past this
 // before another scoop is allowed
 let resetTrigger = -0.3;
+
+
+// -------------------------
+// PHONE TEST UPDATE
+// -------------------------
+
+// Full scoop gesture:
+//
+// waiting
+// → finger touches while phone is above resetTrigger
+// → ready
+// → phone dips below scoopTrigger
+// → dipped
+// → phone returns above resetTrigger
+// → scoop is created
+// → complete
+//
+// Finger must be released before
+// beginning another scoop.
+let scoopState = "waiting";
+
+// Keep counting successful scoops even
+// though only 4 are displayed at once.
+let totalScoops = 0;
 
 
 function setup() {
@@ -92,39 +115,14 @@ function draw() {
   // DETECT SCOOP
   // -------------------------
 
-  // Scoop tests were around
-  // X = -0.8 to -1.4
+  // STEP 4 originally added fingerHeld as
+  // a gate so tilting without a finger did
+  // not create a scoop.
   //
-  // STEP 4: the held finger now gates this —
-  // tilting with no finger down does nothing.
-  // It still fires on the way DOWN; the full
-  // arc arrives in Step 6.
-  if (
-    rotationX < scoopTrigger &&
-    readyToScoop &&
-    fingerHeld &&
-    scoops.length < 4
-  ) {
-
-    addScoop();
-
-    // Prevent one movement from
-    // creating lots of circles
-    readyToScoop = false;
-  }
-
-
-  // -------------------------
-  // RESET FOR NEXT SCOOP
-  // -------------------------
-
-  // Bring phone back toward
-  // normal position
-  if (rotationX > resetTrigger) {
-
-    readyToScoop = true;
-
-  }
+  // PHONE TEST UPDATE:
+  // Recognition now uses the full movement:
+  // finger down → dip → return up.
+  updateScoopGesture();
 
 
   // -------------------------
@@ -148,21 +146,10 @@ function draw() {
 
 
     // Temporary colours
-    if (i === 0) {
-      fill(255, 190, 200);
-    }
-
-    if (i === 1) {
-      fill(190, 220, 255);
-    }
-
-    if (i === 2) {
-      fill(220, 195, 255);
-    }
-
-    if (i === 3) {
-      fill(255, 225, 170);
-    }
+    // Colour is now stored with each scoop
+    // so it stays the same when an old scoop
+    // disappears from the array.
+    fill(s.colour);
 
 
     circle(
@@ -183,26 +170,20 @@ function draw() {
   textSize(18);
 
 
-  if (scoops.length === 0) {
+  if (totalScoops === 0) {
 
     text(
-      "Scoop!",
-      width / 2,
-      height - 50
-    );
-
-  } else if (scoops.length < 4) {
-
-    text(
-      scoops.length + " / 4",
+      "Hold + Scoop!",
       width / 2,
       height - 50
     );
 
   } else {
 
+    // PHONE TEST UPDATE:
+    // No 4-scoop game limit anymore.
     text(
-      "4 / 4",
+      totalScoops + " scoops",
       width / 2,
       height - 50
     );
@@ -216,12 +197,122 @@ function draw() {
 
 
 // -------------------------
+// PHONE TEST UPDATE
+// FULL SCOOP GESTURE
+// -------------------------
+
+function updateScoopGesture() {
+
+  // -------------------------
+  // NO FINGER
+  // -------------------------
+
+  // Lifting the finger at any point
+  // cancels the current attempt.
+  if (!fingerHeld) {
+
+    scoopState = "waiting";
+    return;
+  }
+
+
+  // -------------------------
+  // CLEAN START
+  // -------------------------
+
+  // A scoop can begin only when the
+  // finger is down AND the phone is
+  // above the reset threshold.
+  //
+  // If the finger lands while the
+  // phone is already dipped, nothing
+  // starts.
+  if (scoopState === "waiting") {
+
+    if (rotationX > resetTrigger) {
+
+      scoopState = "ready";
+    }
+
+    return;
+  }
+
+
+  // -------------------------
+  // DIP DOWN
+  // -------------------------
+
+  // The phone must pass the same scoop
+  // threshold used in the original test.
+  if (scoopState === "ready") {
+
+    if (rotationX < scoopTrigger) {
+
+      scoopState = "dipped";
+    }
+
+    return;
+  }
+
+
+  // -------------------------
+  // RETURN UP
+  // -------------------------
+
+  // The scoop is NOT created while
+  // dipping down.
+  //
+  // It is created only when the phone
+  // comes back above resetTrigger,
+  // completing the full scoop arc.
+  if (scoopState === "dipped") {
+
+    if (rotationX > resetTrigger) {
+
+      addScoop();
+
+      // Prevent one continuous finger hold
+      // from creating multiple scoops.
+      scoopState = "complete";
+    }
+
+    return;
+  }
+
+
+  // -------------------------
+  // COMPLETE
+  // -------------------------
+
+  // Do nothing here.
+  //
+  // The user must release the tracked
+  // finger before a new scoop can begin.
+}
+
+
+// -------------------------
 // ADD ONE SCOOP
 // -------------------------
 
 function addScoop() {
 
-  let number = scoops.length;
+  totalScoops++;
+
+
+  // Temporary colours
+  let colours = [
+    "#FFBEC8",
+    "#BEDCFF",
+    "#DCC3FF",
+    "#FFE1AA"
+  ];
+
+
+  // Cycle through the 4 colours forever.
+  let colourIndex =
+    (totalScoops - 1) % colours.length;
+
 
   scoops.push({
 
@@ -230,15 +321,44 @@ function addScoop() {
     // Starts OUTSIDE screen
     y: -80,
 
-    // Each new scoop stacks
-    // slightly higher
-    targetY:
-      height * 0.72 -
-      number * 75,
+    // Target position will be updated
+    // below when the visible scoops restack.
+    targetY: height * 0.72,
 
-    size: 110
+    size: 110,
+
+    colour: colours[colourIndex]
 
   });
+
+
+  // -------------------------
+  // PHONE TEST UPDATE
+  // CONTINUOUS PLAY
+  // -------------------------
+
+  // The interaction no longer stops
+  // after 4 scoops.
+  //
+  // Keep only the latest 4 visible
+  // so the phone does not accumulate
+  // circles forever.
+  if (scoops.length > 4) {
+
+    scoops.shift();
+  }
+
+
+  // Restack the visible scoops.
+  //
+  // Newest scoop sits lowest.
+  // Older scoops move upward.
+  for (let i = 0; i < scoops.length; i++) {
+
+    scoops[i].targetY =
+      height * 0.72 -
+      (scoops.length - 1 - i) * 75;
+  }
 }
 
 
@@ -261,6 +381,7 @@ function updateFinger() {
     // finger that is already down is never
     // adopted as the tracked one.
     if (!empty && touchesWereEmpty) {
+
       trackedFingerId = touches[0].id;
     }
 
@@ -271,14 +392,22 @@ function updateFinger() {
     let stillDown = false;
 
     for (let i = 0; i < touches.length; i++) {
+
       if (touches[i].id === trackedFingerId) {
+
         stillDown = true;
         break;
       }
     }
 
     if (!stillDown) {
+
       trackedFingerId = null;
+
+      // PHONE TEST UPDATE:
+      // Releasing the original finger
+      // cancels/resets the scoop gesture.
+      scoopState = "waiting";
     }
   }
 
@@ -288,12 +417,14 @@ function updateFinger() {
 
 
 function mousePressed() {
+
   updateFinger();
   return false; // let p5-phone manage the touch
 }
 
 
 function mouseReleased() {
+
   updateFinger();
   return false;
 }
@@ -319,6 +450,23 @@ function drawDebugReadout() {
     12,
     30
   );
+
+
+  // PHONE TEST UPDATE:
+  // Show the gesture state so we can see
+  // exactly where recognition succeeds/fails.
+  text(
+    "state " + scoopState,
+    12,
+    48
+  );
+
+  text(
+    "successful scoops " + totalScoops,
+    12,
+    66
+  );
+
 
   // put the main text back
   textAlign(CENTER, CENTER);
