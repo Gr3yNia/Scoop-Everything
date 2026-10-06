@@ -13,7 +13,6 @@ let fingerHeld = false;
 let touchesWereEmpty = true;
 
 // SCOOP SETTINGS
-let scoops = [];
 
 // Based on tests:
 // scoop X was roughly -0.8 to -1.4
@@ -43,10 +42,29 @@ let resetTrigger = -0.3;
 // beginning another scoop.
 let scoopState = "waiting";
 
-// Keep counting successful scoops even
-// though only 4 are displayed at once.
 let totalScoops = 0;
 
+
+// -------------------------
+// ARTWORK
+// -------------------------
+
+// PHONE TEST UPDATE:
+// Instead of stacking 4 circles,
+// one successful scoop reveals
+// one full-screen artwork.
+
+let artworkActive = false;
+
+let fragments = [];
+
+let rotationNow = 0;
+let spreadNow = 1;
+
+
+// -------------------------
+// SETUP
+// -------------------------
 
 function setup() {
 
@@ -68,12 +86,32 @@ function setup() {
   enableSensorOn("#enable-sensors");
 
   lockGestures();
+
+
+  // -------------------------
+  // ARTWORK SETUP
+  // -------------------------
+
+  // IMPORTANT:
+  // We intentionally DO NOT use
+  // angleMode(DEGREES) here.
+  //
+  // The scoop thresholds were already
+  // tested successfully on the phone
+  // using the current angle behaviour.
+
+  createFragments();
 }
 
 
+// -------------------------
+// DRAW
+// -------------------------
+
 function draw() {
 
-  background(245);
+  // Artwork background
+  background(14, 14, 15);
 
 
   // -------------------------
@@ -82,7 +120,7 @@ function draw() {
 
   if (!window.sensorsEnabled) {
 
-    fill(20);
+    fill(240);
     noStroke();
 
     textSize(18);
@@ -126,68 +164,27 @@ function draw() {
 
 
   // -------------------------
-  // DRAW SCOOPS
+  // ARTWORK
   // -------------------------
 
-  for (let i = 0; i < scoops.length; i++) {
+  if (artworkActive) {
 
-    let s = scoops[i];
+    drawArtwork();
 
-    // Make the scoop fall
-    // into the screen
-    s.y = lerp(
-      s.y,
-      s.targetY,
-      0.08
-    );
+  } else {
 
+    // Before the first successful scoop,
+    // keep the visual space empty.
 
+    fill(225);
     noStroke();
-
-
-    // Temporary colours
-    // Colour is now stored with each scoop
-    // so it stays the same when an old scoop
-    // disappears from the array.
-    fill(s.colour);
-
-
-    circle(
-      s.x,
-      s.y,
-      s.size
-    );
-  }
-
-
-  // -------------------------
-  // TEXT
-  // -------------------------
-
-  fill(20);
-  noStroke();
-
-  textSize(18);
-
-
-  if (totalScoops === 0) {
+    textSize(18);
 
     text(
       "Hold + Scoop!",
       width / 2,
       height - 50
     );
-
-  } else {
-
-    // PHONE TEST UPDATE:
-    // No 4-scoop game limit anymore.
-    text(
-      totalScoops + " scoops",
-      width / 2,
-      height - 50
-    );
-
   }
 
 
@@ -300,65 +297,387 @@ function addScoop() {
   totalScoops++;
 
 
-  // Temporary colours
-  let colours = [
-    "#FFBEC8",
-    "#BEDCFF",
-    "#DCC3FF",
-    "#FFE1AA"
-  ];
-
-
-  // Cycle through the 4 colours forever.
-  let colourIndex =
-    (totalScoops - 1) % colours.length;
-
-
-  scoops.push({
-
-    x: width / 2,
-
-    // Starts OUTSIDE screen
-    y: -80,
-
-    // Target position will be updated
-    // below when the visible scoops restack.
-    targetY: height * 0.72,
-
-    size: 110,
-
-    colour: colours[colourIndex]
-
-  });
-
-
   // -------------------------
-  // PHONE TEST UPDATE
-  // CONTINUOUS PLAY
+  // ARTWORK UPDATE
   // -------------------------
 
-  // The interaction no longer stops
-  // after 4 scoops.
+  // A successful scoop now reveals
+  // the fragmented visual space.
+  artworkActive = true;
+
+
+  // Create a fresh arrangement for
+  // every new scoop.
+  createFragments();
+
+
+  // Reset the visual movement.
+  rotationNow = 0;
+  spreadNow = 1;
+}
+
+
+// =====================================
+// ARTWORK
+// =====================================
+
+function createFragments() {
+
+  fragments = [];
+
+
+  // Create a fixed family of fragments
+  for (let i = 0; i < 12; i++) {
+
+    fragments.push({
+
+      distance: random(0.25, 1),
+
+      size: random(25, 85),
+
+      offset: random(-28, 28),
+
+      // Original artwork used degrees.
+      // Store this as radians instead.
+      rotation: radians(
+        random(-25, 25)
+      ),
+
+      // Same conversion for animation phase.
+      phase: radians(
+        random(360)
+      ),
+
+      type: floor(random(4))
+    });
+  }
+}
+
+
+// =====================================
+// DRAW ARTWORK
+// =====================================
+
+function drawArtwork() {
+
+  // ---------------------------------
+  // VISUAL MOTION
+  // ---------------------------------
+
+  // For this first integration test,
+  // the artwork moves gently by itself.
   //
-  // Keep only the latest 4 visible
-  // so the phone does not accumulate
-  // circles forever.
-  if (scoops.length > 4) {
+  // We are NOT connecting shake or
+  // phone movement yet.
 
-    scoops.shift();
+  let targetRotation =
+    sin(frameCount * 0.008) *
+    radians(8);
+
+  let targetSpread =
+    1 +
+    sin(frameCount * 0.012) *
+    0.08;
+
+
+  // Smooth movement
+  rotationNow = lerp(
+    rotationNow,
+    targetRotation,
+    0.045
+  );
+
+  spreadNow = lerp(
+    spreadNow,
+    targetSpread,
+    0.045
+  );
+
+
+  push();
+
+  translate(
+    width / 2,
+    height / 2
+  );
+
+
+  drawAtmosphere();
+
+
+  // ---------------------------------
+  // RADIAL STRUCTURE
+  // ---------------------------------
+
+  let sections = 6;
+
+  for (let i = 0; i < sections; i++) {
+
+    push();
+
+    rotate(
+      i * (TWO_PI / sections)
+      + rotationNow
+    );
+
+    drawFragmentGroup(i);
+
+
+    // mirrored version
+    scale(1, -1);
+
+    drawFragmentGroup(i);
+
+    pop();
   }
 
 
-  // Restack the visible scoops.
-  //
-  // Newest scoop sits lowest.
-  // Older scoops move upward.
-  for (let i = 0; i < scoops.length; i++) {
+  drawVoid();
 
-    scoops[i].targetY =
-      height * 0.72 -
-      (scoops.length - 1 - i) * 75;
+  pop();
+}
+
+
+// =====================================
+// FRAGMENT GROUP
+// =====================================
+
+function drawFragmentGroup(section) {
+
+  let maxRadius =
+    min(width, height) * 0.38;
+
+
+  for (let i = 0; i < fragments.length; i++) {
+
+    let f = fragments[i];
+
+    push();
+
+
+    let radius =
+      maxRadius *
+      f.distance *
+      spreadNow;
+
+
+    // very subtle movement
+    let drift =
+      sin(
+        frameCount * 0.003 +
+        f.phase
+      ) * 4;
+
+
+    translate(
+      radius + drift,
+      f.offset
+    );
+
+
+    rotate(
+      f.rotation +
+      rotationNow * 0.25
+    );
+
+
+    drawFragment(
+      f.type,
+      f.size
+    );
+
+    pop();
   }
+}
+
+
+// =====================================
+// FRAGMENT SHAPES
+// =====================================
+
+function drawFragment(type, s) {
+
+  strokeWeight(0.8);
+
+
+  if (type === 0) {
+
+    // Burnt orange glass
+    fill(186, 91, 45, 115);
+    stroke(226, 146, 100, 150);
+
+    beginShape();
+
+    vertex(-s * 0.50, -s * 0.10);
+    vertex(-s * 0.15, -s * 0.45);
+    vertex(s * 0.48, -s * 0.18);
+    vertex(s * 0.30, s * 0.38);
+    vertex(-s * 0.30, s * 0.28);
+
+    endShape(CLOSE);
+
+  }
+
+  else if (type === 1) {
+
+    // Warm translucent white
+    fill(218, 214, 202, 55);
+    stroke(240, 236, 222, 110);
+
+    beginShape();
+
+    vertex(-s * 0.48, 0);
+    vertex(-s * 0.12, -s * 0.32);
+    vertex(s * 0.46, -s * 0.16);
+    vertex(s * 0.28, s * 0.28);
+    vertex(-s * 0.28, s * 0.38);
+
+    endShape(CLOSE);
+
+  }
+
+  else if (type === 2) {
+
+    // Smoke glass
+    fill(78, 75, 72, 125);
+    stroke(155, 150, 140, 80);
+
+    triangle(
+      -s * 0.45,
+      s * 0.30,
+
+      0,
+      -s * 0.48,
+
+      s * 0.45,
+      s * 0.30
+    );
+
+  }
+
+  else {
+
+    // Small circular fragment
+    fill(205, 181, 145, 75);
+    stroke(230, 214, 190, 100);
+
+    circle(
+      0,
+      0,
+      s * 0.55
+    );
+  }
+}
+
+
+// =====================================
+// BACKGROUND ATMOSPHERE
+// =====================================
+
+function drawAtmosphere() {
+
+  noStroke();
+
+  for (let d = 400; d > 20; d -= 25) {
+
+    let a = map(
+      d,
+      400,
+      20,
+      0,
+      10
+    );
+
+    fill(
+      220,
+      205,
+      180,
+      a
+    );
+
+    circle(
+      0,
+      0,
+      d
+    );
+  }
+}
+
+
+// =====================================
+// CENTRAL VOID
+// =====================================
+
+function drawVoid() {
+
+  push();
+
+
+  // Outer circle
+  noFill();
+
+  stroke(
+    220,
+    211,
+    195,
+    70
+  );
+
+  strokeWeight(1);
+
+  circle(
+    0,
+    0,
+    105
+  );
+
+
+  // Orange inner circle
+  stroke(
+    186,
+    91,
+    45,
+    150
+  );
+
+  circle(
+    0,
+    0,
+    70
+  );
+
+
+  // Dark centre
+  noStroke();
+
+  fill(
+    10,
+    10,
+    11
+  );
+
+  circle(
+    0,
+    0,
+    48
+  );
+
+
+  // Tiny point
+  fill(
+    225,
+    214,
+    195
+  );
+
+  circle(
+    0,
+    0,
+    5
+  );
+
+
+  pop();
 }
 
 
@@ -372,6 +691,7 @@ function addScoop() {
 function updateFinger() {
 
   let empty = touches.length === 0;
+
 
   if (trackedFingerId === null) {
 
@@ -391,6 +711,7 @@ function updateFinger() {
     // attempt. Another finger lifting does not.
     let stillDown = false;
 
+
     for (let i = 0; i < touches.length; i++) {
 
       if (touches[i].id === trackedFingerId) {
@@ -399,6 +720,7 @@ function updateFinger() {
         break;
       }
     }
+
 
     if (!stillDown) {
 
@@ -411,7 +733,10 @@ function updateFinger() {
     }
   }
 
-  fingerHeld = trackedFingerId !== null;
+
+  fingerHeld =
+    trackedFingerId !== null;
+
   touchesWereEmpty = empty;
 }
 
@@ -430,39 +755,50 @@ function mouseReleased() {
 }
 
 
+// -------------------------
+// STEP 3 — TEMPORARY DEBUG
+// -------------------------
+
 function drawDebugReadout() {
 
   // TEMPORARY — delete once the gesture works
-  fill(20);
+  fill(240);
   noStroke();
+
   textSize(12);
   textAlign(LEFT, TOP);
 
+
   text(
-    "rotationX " + rotationX.toFixed(2),
+    "rotationX " +
+    rotationX.toFixed(2),
     12,
     12
   );
 
+
   text(
-    "finger " + (fingerHeld ? "down" : "up") +
-      "  id " + (trackedFingerId === null ? "-" : trackedFingerId),
+    "finger " +
+    (fingerHeld ? "down" : "up") +
+    "  id " +
+    (trackedFingerId === null
+      ? "-"
+      : trackedFingerId),
     12,
     30
   );
 
 
-  // PHONE TEST UPDATE:
-  // Show the gesture state so we can see
-  // exactly where recognition succeeds/fails.
   text(
     "state " + scoopState,
     12,
     48
   );
 
+
   text(
-    "successful scoops " + totalScoops,
+    "successful scoops " +
+    totalScoops,
     12,
     66
   );
@@ -483,6 +819,7 @@ function windowResized() {
     windowWidth,
     windowHeight
   );
+
 
   if (button) {
 
