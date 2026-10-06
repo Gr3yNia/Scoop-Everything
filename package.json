@@ -1,0 +1,12 @@
+{
+  "name": "atelier1-f26-agent-start-p5",
+  "private": true,
+  "version": "1.0.0",
+  "description": "A p5.js 2 and p5-phone starter, set up for working with a coding agent.",
+  "scripts": {
+    "phone": "node scripts/phone.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
