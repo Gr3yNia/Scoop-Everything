@@ -606,8 +606,40 @@ function drawGameHUD() {
 
   textSize(9);
 
+
+  // Friendlier message than the raw
+  // state name.
+  //
+  // waiting = nothing to do yet:
+  //   before the first scoop, ask for
+  //   a scoop; afterwards, invite the
+  //   player to move the device.
+  // ready = waiting for the dip.
+
+  let stateLabel =
+    scoopState.toUpperCase();
+
+
+  if (
+    scoopState === "ready"
+  ) {
+
+    stateLabel = "READY TO SCOOP";
+  }
+
+
+  if (
+    scoopState === "waiting"
+  ) {
+
+    stateLabel = artworkActive
+      ? "MOVE THE DEVICE TO PLAY"
+      : "READY TO SCOOP";
+  }
+
+
   text(
-    scoopState.toUpperCase(),
+    stateLabel,
     x + 55,
     y + 82
   );
