@@ -36,6 +36,111 @@ let totalScoops = 0;
 
 
 // =====================================
+// ARTWORK PALETTES
+// =====================================
+
+// The artwork cycles through these
+// after every successful scoop.
+//
+// First scoop = Burnt Orange,
+// then Dusty Lavender, Mist Blue,
+// Sage Glass, then back to orange.
+//
+// The Burnt Orange entries are the
+// original hand-tuned colours.
+// The others were lightened from the
+// same colour using one rule:
+// lerp(original, white, 0.45).
+//
+// Alphas live at the call sites and
+// never change.
+
+const PALETTES = [
+  {
+    name: "Burnt Orange",
+
+    main: [186, 91, 45],
+    smoke: [78, 75, 72],
+    light: [218, 214, 202],
+
+    mainStroke: [226, 146, 100],
+    smokeStroke: [155, 150, 140],
+    lightStroke: [240, 236, 222],
+
+    warm: [205, 181, 145],
+    warmStroke: [230, 214, 190],
+
+    atmosphere: [220, 205, 180],
+    voidOuter: [220, 211, 195],
+    voidPoint: [225, 214, 195]
+  },
+
+  {
+    name: "Dusty Lavender",
+
+    main: [157, 137, 180],
+    smoke: [82, 76, 91],
+    light: [225, 220, 229],
+
+    mainStroke: [201, 190, 214],
+    smokeStroke: [160, 157, 165],
+    lightStroke: [239, 236, 241],
+
+    warm: [201, 191, 212],
+    warmStroke: [225, 220, 231],
+
+    atmosphere: [217, 210, 223],
+    voidOuter: [225, 220, 229],
+    voidPoint: [225, 220, 229]
+  },
+
+  {
+    name: "Mist Blue",
+
+    main: [123, 158, 181],
+    smoke: [69, 79, 87],
+    light: [220, 228, 230],
+
+    mainStroke: [182, 202, 214],
+    smokeStroke: [153, 158, 163],
+    lightStroke: [236, 240, 241],
+
+    warm: [186, 204, 213],
+    warmStroke: [217, 227, 232],
+
+    atmosphere: [208, 220, 224],
+    voidOuter: [220, 228, 230],
+    voidPoint: [220, 228, 230]
+  },
+
+  {
+    name: "Sage Glass",
+
+    main: [132, 158, 143],
+    smoke: [70, 80, 75],
+    light: [220, 226, 217],
+
+    mainStroke: [187, 202, 193],
+    smokeStroke: [153, 159, 156],
+    lightStroke: [236, 239, 234],
+
+    warm: [189, 202, 191],
+    warmStroke: [219, 226, 220],
+
+    atmosphere: [209, 218, 208],
+    voidOuter: [220, 226, 217],
+    voidPoint: [220, 226, 217]
+  }
+];
+
+
+// Which palette the artwork shows now.
+// Advanced inside addScoop().
+
+let paletteIndex = 0;
+
+
+// =====================================
 // ARTWORK
 // =====================================
 
@@ -651,6 +756,15 @@ function addScoop() {
   totalScoops++;
 
 
+  // Cycle the artwork palette.
+  //
+  // First scoop shows palette 0,
+  // then 1, 2, 3 and back to 0.
+
+  paletteIndex =
+    (totalScoops - 1) % PALETTES.length;
+
+
   // Successful scoop reveals artwork.
 
   artworkActive = true;
@@ -947,6 +1061,11 @@ function drawFragment(
 ) {
 
 
+  // Current artwork palette.
+
+  let c = PALETTES[paletteIndex];
+
+
   strokeWeight(0.8);
 
 
@@ -954,19 +1073,19 @@ function drawFragment(
     type === 0
   ) {
 
-    // Burnt orange glass
+    // Palette main colour
 
     fill(
-      186,
-      91,
-      45,
+      c.main[0],
+      c.main[1],
+      c.main[2],
       115
     );
 
     stroke(
-      226,
-      146,
-      100,
+      c.mainStroke[0],
+      c.mainStroke[1],
+      c.mainStroke[2],
       150
     );
 
@@ -1008,19 +1127,19 @@ function drawFragment(
     type === 1
   ) {
 
-    // Warm translucent white
+    // Palette light colour
 
     fill(
-      218,
-      214,
-      202,
+      c.light[0],
+      c.light[1],
+      c.light[2],
       55
     );
 
     stroke(
-      240,
-      236,
-      222,
+      c.lightStroke[0],
+      c.lightStroke[1],
+      c.lightStroke[2],
       110
     );
 
@@ -1062,19 +1181,19 @@ function drawFragment(
     type === 2
   ) {
 
-    // Smoke glass
+    // Palette smoke colour
 
     fill(
-      78,
-      75,
-      72,
+      c.smoke[0],
+      c.smoke[1],
+      c.smoke[2],
       125
     );
 
     stroke(
-      155,
-      150,
-      140,
+      c.smokeStroke[0],
+      c.smokeStroke[1],
+      c.smokeStroke[2],
       80
     );
 
@@ -1095,18 +1214,19 @@ function drawFragment(
   else {
 
     // Small circular fragment
+    // Tinted from the palette
 
     fill(
-      205,
-      181,
-      145,
+      c.warm[0],
+      c.warm[1],
+      c.warm[2],
       75
     );
 
     stroke(
-      230,
-      214,
-      190,
+      c.warmStroke[0],
+      c.warmStroke[1],
+      c.warmStroke[2],
       100
     );
 
@@ -1125,6 +1245,8 @@ function drawFragment(
 // =====================================
 
 function drawAtmosphere() {
+
+  let c = PALETTES[paletteIndex];
 
   noStroke();
 
@@ -1146,9 +1268,9 @@ function drawAtmosphere() {
 
 
     fill(
-      220,
-      205,
-      180,
+      c.atmosphere[0],
+      c.atmosphere[1],
+      c.atmosphere[2],
       a
     );
 
@@ -1168,6 +1290,8 @@ function drawAtmosphere() {
 
 function drawVoid() {
 
+  let c = PALETTES[paletteIndex];
+
   push();
 
 
@@ -1176,9 +1300,9 @@ function drawVoid() {
   noFill();
 
   stroke(
-    220,
-    211,
-    195,
+    c.voidOuter[0],
+    c.voidOuter[1],
+    c.voidOuter[2],
     70
   );
 
@@ -1192,12 +1316,12 @@ function drawVoid() {
   );
 
 
-  // Orange inner circle
+  // Palette inner circle
 
   stroke(
-    186,
-    91,
-    45,
+    c.main[0],
+    c.main[1],
+    c.main[2],
     150
   );
 
@@ -1230,9 +1354,9 @@ function drawVoid() {
   // Tiny point
 
   fill(
-    225,
-    214,
-    195
+    c.voidPoint[0],
+    c.voidPoint[1],
+    c.voidPoint[2]
   );
 
 
