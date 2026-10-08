@@ -16,10 +16,23 @@
       margin: 0;
       padding: 0;
       overflow: hidden;
+
+      /* iOS Safari: stop a slow touch starting
+         text selection, the long-press callout,
+         and the tap highlight flash.
+         Visual only — no touch events affected. */
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
     }
 
     canvas {
       display: block;
+
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      user-select: none;
     }
   </style>
 </head>

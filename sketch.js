@@ -1,76 +1,54 @@
 // Scoop Everything
 // Mobile motion interaction experiment
 
-// Permission now comes from p5-phone as window.sensorsEnabled.
-// Do NOT redeclare `sensorsEnabled` here: a top-level `let` would shadow
-// p5-phone's flag and sit at false forever.
+// Permission comes from p5-phone as window.sensorsEnabled.
+// Do NOT redeclare sensorsEnabled.
 let button;
 
 
-// -------------------------
-// STEP 3 — TEMPORARY DEBUG
-// -------------------------
+// =====================================
+// TOUCH TRACKING
+// =====================================
 
-// Remove this whole block once the scoop gesture is reliable.
 let trackedFingerId = null;
 let fingerHeld = false;
 let touchesWereEmpty = true;
 
 
-// -------------------------
+// =====================================
 // SCOOP SETTINGS
-// -------------------------
+// =====================================
 
-// Based on tests:
-// scoop X was roughly -0.8 to -1.4
+// IMPORTANT:
+// Keep these values unchanged.
+// They were tested successfully on the phone.
+
 let scoopTrigger = -0.7;
-
-// Phone must come back past this
-// before another scoop is allowed
 let resetTrigger = -0.3;
 
 
-// -------------------------
-// PHONE TEST UPDATE
-// -------------------------
+// =====================================
+// SCOOP STATE
+// =====================================
 
-// Full scoop gesture:
-//
-// waiting
-// → finger touches while phone is above resetTrigger
-// → ready
-// → phone dips below scoopTrigger
-// → dipped
-// → phone returns above resetTrigger
-// → scoop is created
-// → complete
-//
-// Finger must be released before
-// beginning another scoop.
 let scoopState = "waiting";
-
 let totalScoops = 0;
 
 
-// -------------------------
+// =====================================
 // ARTWORK
-// -------------------------
-
-// Instead of stacking 4 circles,
-// one successful scoop reveals
-// one full-screen artwork.
+// =====================================
 
 let artworkActive = false;
-
 let fragments = [];
 
 let rotationNow = 0;
 let spreadNow = 1;
 
 
-// -------------------------
+// =====================================
 // SETUP
-// -------------------------
+// =====================================
 
 function setup() {
 
@@ -78,12 +56,15 @@ function setup() {
 
   textAlign(CENTER, CENTER);
 
+
+  // -------------------------
+  // SENSOR BUTTON
+  // -------------------------
+
   button = createButton(
     "Enable Motion Sensors"
   );
 
-  // p5-phone binds the permission request
-  // to this element
   button.id("enable-sensors");
 
   button.position(
@@ -95,6 +76,9 @@ function setup() {
     180,
     50
   );
+
+
+  // p5-phone handles permission
 
   enableSensorOn(
     "#enable-sensors"
@@ -108,20 +92,18 @@ function setup() {
   // -------------------------
 
   // IMPORTANT:
-  // We intentionally DO NOT use
-  // angleMode(DEGREES) here.
+  // Do NOT use angleMode(DEGREES).
   //
-  // The scoop thresholds were already
-  // tested successfully on the phone
+  // The scoop thresholds were tested
   // using the current angle behaviour.
 
   createFragments();
 }
 
 
-// -------------------------
+// =====================================
 // DRAW
-// -------------------------
+// =====================================
 
 function draw() {
 
@@ -132,19 +114,28 @@ function draw() {
   );
 
 
-  // -------------------------
+  // =====================================
   // BEFORE SENSOR PERMISSION
-  // -------------------------
+  // =====================================
 
   if (!window.sensorsEnabled) {
 
-    fill(240);
+    drawGameHeader();
+
+    fill(210);
     noStroke();
 
-    textSize(18);
+    textFont("monospace");
+    textStyle(NORMAL);
+    textSize(13);
+
+    textAlign(
+      CENTER,
+      CENTER
+    );
 
     text(
-      "Tap the button to start",
+      "TAP TO BEGIN",
       width / 2,
       height / 2 - 70
     );
@@ -153,41 +144,26 @@ function draw() {
   }
 
 
-  // enableSensorOn leaves the element
-  // on the page, so hide it once
-  // permission is granted.
-  if (button) {
+  // Hide permission button
+  // once permission is granted.
 
+  if (button) {
     button.hide();
   }
 
 
-  // -------------------------
-  // STEP 3 — TEMPORARY DEBUG
-  // -------------------------
+  // =====================================
+  // UPDATE INTERACTION
+  // =====================================
 
   updateFinger();
-
-
-  // -------------------------
-  // DETECT SCOOP
-  // -------------------------
-
-  // STEP 4 originally added fingerHeld
-  // as a gate so tilting without a finger
-  // did not create a scoop.
-  //
-  // PHONE TEST UPDATE:
-  // Recognition now uses the full movement:
-  //
-  // finger down → dip → return up
 
   updateScoopGesture();
 
 
-  // -------------------------
+  // =====================================
   // ARTWORK
-  // -------------------------
+  // =====================================
 
   if (artworkActive) {
 
@@ -195,27 +171,377 @@ function draw() {
 
   } else {
 
-    // Before the first successful scoop,
-    // keep the visual space empty.
+    // Before first successful scoop.
 
-    fill(225);
+    fill(
+      225,
+      200
+    );
+
     noStroke();
 
-    textSize(18);
+    textFont("monospace");
+    textStyle(NORMAL);
+    textSize(13);
+
+    textAlign(
+      CENTER,
+      CENTER
+    );
 
     text(
-      "Hold + Scoop!",
+      "HOLD + SCOOP",
       width / 2,
-      height - 50
+      height / 2
     );
   }
 
 
+  // =====================================
+  // GAME UI
+  // =====================================
+
+  drawGameHeader();
+
+  drawGameHUD();
+}
+
+
+// =====================================
+// GAME HEADER
+// =====================================
+
+function drawGameHeader() {
+
+  push();
+
+
   // -------------------------
-  // STEP 3 — TEMPORARY DEBUG
+  // MAIN TITLE
   // -------------------------
 
-  drawDebugReadout();
+  textFont("monospace");
+
+  textAlign(
+    LEFT,
+    TOP
+  );
+
+  noStroke();
+
+
+  // SCOOP
+
+  fill(
+    245,
+    245,
+    242
+  );
+
+  textStyle(BOLD);
+
+  textSize(
+    constrain(
+      width * 0.058,
+      21,
+      29
+    )
+  );
+
+  text(
+    "SCOOP",
+    20,
+    22
+  );
+
+
+  // EVERYTHING
+
+  text(
+    "EVERYTHING",
+    20,
+    48
+  );
+
+
+  // -------------------------
+  // SMALL INTERACTION LINE
+  // -------------------------
+
+  textStyle(NORMAL);
+
+  textSize(9);
+
+  fill(
+    190,
+    190,
+    185,
+    170
+  );
+
+  text(
+    "SCOOP  ·  MOVE  ·  COLLECT",
+    21,
+    82
+  );
+
+
+  // -------------------------
+  // SMALL ACCENT LINE
+  // -------------------------
+
+  stroke(
+    186,
+    91,
+    45,
+    150
+  );
+
+  strokeWeight(1);
+
+  line(
+    21,
+    101,
+    67,
+    101
+  );
+
+
+  pop();
+}
+
+
+// =====================================
+// GAME HUD
+// =====================================
+
+function drawGameHUD() {
+
+  push();
+
+  textFont("monospace");
+
+  textAlign(
+    LEFT,
+    TOP
+  );
+
+  noStroke();
+
+
+  // Position HUD from bottom-left.
+
+  let x = 20;
+
+  let bottomMargin = 22;
+
+  let hudHeight = 138;
+
+  let y =
+    height -
+    bottomMargin -
+    hudHeight;
+
+
+  // =====================================
+  // MOTION LABEL
+  // =====================================
+
+  fill(
+    190,
+    190,
+    185,
+    150
+  );
+
+  textStyle(NORMAL);
+
+  textSize(8);
+
+  text(
+    "MOTION",
+    x,
+    y
+  );
+
+
+  // =====================================
+  // X + Y VALUES
+  // =====================================
+
+  fill(
+    235,
+    235,
+    230,
+    210
+  );
+
+  textSize(10);
+
+  text(
+    "X",
+    x,
+    y + 17
+  );
+
+  text(
+    rotationX.toFixed(2),
+    x + 28,
+    y + 17
+  );
+
+
+  text(
+    "Y",
+    x,
+    y + 32
+  );
+
+  text(
+    rotationY.toFixed(2),
+    x + 28,
+    y + 32
+  );
+
+
+  // =====================================
+  // DIVIDER
+  // =====================================
+
+  stroke(
+    220,
+    220,
+    215,
+    35
+  );
+
+  strokeWeight(1);
+
+  line(
+    x,
+    y + 53,
+    x + 125,
+    y + 53
+  );
+
+  noStroke();
+
+
+  // =====================================
+  // TOUCH
+  // =====================================
+
+  fill(
+    160,
+    160,
+    155,
+    160
+  );
+
+  textSize(8);
+
+  text(
+    "TOUCH",
+    x,
+    y + 66
+  );
+
+
+  fill(
+    235,
+    235,
+    230,
+    210
+  );
+
+  textSize(9);
+
+  text(
+    fingerHeld
+      ? "DOWN"
+      : "UP",
+    x + 55,
+    y + 65
+  );
+
+
+  // =====================================
+  // STATE
+  // =====================================
+
+  fill(
+    160,
+    160,
+    155,
+    160
+  );
+
+  textSize(8);
+
+  text(
+    "STATE",
+    x,
+    y + 83
+  );
+
+
+  fill(
+    235,
+    235,
+    230,
+    210
+  );
+
+  textSize(9);
+
+  text(
+    scoopState.toUpperCase(),
+    x + 55,
+    y + 82
+  );
+
+
+  // =====================================
+  // SCOOP COUNT
+  // =====================================
+
+  fill(
+    160,
+    160,
+    155,
+    160
+  );
+
+  textSize(8);
+
+  text(
+    "SCOOPS",
+    x,
+    y + 108
+  );
+
+
+  // Make scoop count more prominent.
+
+  fill(
+    225,
+    214,
+    195,
+    240
+  );
+
+  textStyle(BOLD);
+
+  textSize(15);
+
+  text(
+    totalScoops,
+    x + 55,
+    y + 103
+  );
+
+
+  pop();
 }
 
 
@@ -270,9 +596,6 @@ function updateScoopGesture() {
   // DIP DOWN
   // -------------------------
 
-  // The phone must pass the same scoop
-  // threshold used in the original test.
-
   if (scoopState === "ready") {
 
     if (
@@ -290,12 +613,8 @@ function updateScoopGesture() {
   // RETURN UP
   // -------------------------
 
-  // The scoop is NOT created while
-  // dipping down.
-  //
-  // It is created only when the phone
-  // comes back above resetTrigger,
-  // completing the full scoop arc.
+  // Scoop is created only when
+  // the full arc is completed.
 
   if (scoopState === "dipped") {
 
@@ -319,10 +638,7 @@ function updateScoopGesture() {
   // COMPLETE
   // -------------------------
 
-  // Do nothing here.
-  //
-  // The user must release the tracked
-  // finger before a new scoop can begin.
+  // Wait for finger release.
 }
 
 
@@ -335,23 +651,17 @@ function addScoop() {
   totalScoops++;
 
 
-  // -------------------------
-  // ARTWORK UPDATE
-  // -------------------------
-
-  // A successful scoop reveals
-  // the fragmented visual space.
+  // Successful scoop reveals artwork.
 
   artworkActive = true;
 
 
-  // Create a fresh arrangement
-  // for every new scoop.
+  // Fresh arrangement for every scoop.
 
   createFragments();
 
 
-  // Reset the visual movement.
+  // Reset visual movement.
 
   rotationNow = 0;
 
@@ -367,9 +677,6 @@ function createFragments() {
 
   fragments = [];
 
-
-  // Create a fixed family
-  // of fragments.
 
   for (
     let i = 0;
@@ -398,7 +705,7 @@ function createFragments() {
         ),
 
       // Original artwork used degrees.
-      // Store this as radians instead.
+      // Store as radians.
 
       rotation:
         radians(
@@ -407,9 +714,6 @@ function createFragments() {
             25
           )
         ),
-
-      // Same conversion for
-      // animation phase.
 
       phase:
         radians(
@@ -432,26 +736,16 @@ function createFragments() {
 function drawArtwork() {
 
 
-  // ---------------------------------
+  // =====================================
   // PHONE KALEIDOSCOPE INTERACTION
-  // ---------------------------------
+  // =====================================
 
-  // The artwork no longer moves
-  // automatically.
+  // NO FINGER:
+  // gentle phone movement controls artwork.
   //
-  // When the user is NOT touching
-  // the screen:
-  //
-  // small left/right tilt
-  // → rotate artwork
-  //
-  // small forward/back tilt
-  // → open / close artwork
-  //
-  // When a finger IS touching,
-  // the artwork holds its position
-  // and the scoop gesture takes over.
-
+  // FINGER DOWN:
+  // artwork holds position and
+  // scoop gesture takes control.
 
   let targetRotation =
     rotationNow;
@@ -467,12 +761,6 @@ function drawArtwork() {
     // LEFT / RIGHT
     // -------------------------
 
-    // Small changes in rotationY
-    // rotate the kaleidoscope.
-    //
-    // This is intentionally much
-    // gentler than the scoop movement.
-
     targetRotation =
       constrain(
         rotationY * 0.45,
@@ -484,9 +772,6 @@ function drawArtwork() {
     // -------------------------
     // FORWARD / BACK
     // -------------------------
-
-    // Small changes in rotationX
-    // open and close the fragments.
 
     targetSpread =
       map(
@@ -520,9 +805,9 @@ function drawArtwork() {
     );
 
 
-  // -------------------------
+  // =====================================
   // DRAW VISUAL
-  // -------------------------
+  // =====================================
 
   push();
 
@@ -536,9 +821,9 @@ function drawArtwork() {
   drawAtmosphere();
 
 
-  // ---------------------------------
+  // -------------------------
   // RADIAL STRUCTURE
-  // ---------------------------------
+  // -------------------------
 
   let sections = 6;
 
@@ -563,7 +848,7 @@ function drawArtwork() {
     drawFragmentGroup(i);
 
 
-    // mirrored version
+    // Mirrored version
 
     scale(
       1,
@@ -582,32 +867,6 @@ function drawArtwork() {
 
 
   pop();
-
-
-  // ---------------------------------
-  // KALEIDOSCOPE INSTRUCTION
-  // ---------------------------------
-
-  fill(
-    240,
-    220
-  );
-
-  noStroke();
-
-  textSize(14);
-
-  textAlign(
-    CENTER,
-    CENTER
-  );
-
-
-  text(
-    "Move your phone to reveal the magic of the kaleidoscope.",
-    width / 2,
-    height - 45
-  );
 }
 
 
@@ -644,12 +903,7 @@ function drawFragmentGroup(section) {
 
 
     // Very subtle internal movement.
-    //
-    // This is NOT the old automatic
-    // open/close interaction.
-    //
-    // It only gives individual pieces
-    // a tiny living quality.
+    // Gives fragments a living quality.
 
     let drift =
       sin(
@@ -994,10 +1248,7 @@ function drawVoid() {
 
 
 // =====================================
-// STEP 3 — TEMPORARY DEBUG
-// Finger tracking + readout.
-// Remove this whole block once the
-// scoop gesture is reliable.
+// FINGER TRACKING
 // =====================================
 
 function updateFinger() {
@@ -1011,14 +1262,8 @@ function updateFinger() {
   ) {
 
 
-    // Start an attempt only on a NEW touch
-    // (0 -> 1).
-    //
-    // A second finger landing while one
-    // is already down is ignored.
-    //
-    // A finger that is already down is
-    // never adopted as the tracked one.
+    // Start only on a NEW touch.
+    // A second finger is ignored.
 
     if (
       !empty &&
@@ -1032,10 +1277,8 @@ function updateFinger() {
   } else {
 
 
-    // Only the tracked finger can end
-    // the attempt.
-    //
-    // Another finger lifting does not.
+    // Only tracked finger can
+    // end the attempt.
 
     let stillDown =
       false;
@@ -1068,9 +1311,8 @@ function updateFinger() {
         null;
 
 
-      // PHONE TEST UPDATE:
-      // Releasing the original finger
-      // cancels/resets the scoop gesture.
+      // Releasing original finger
+      // resets scoop gesture.
 
       scoopState =
         "waiting";
@@ -1096,7 +1338,6 @@ function mousePressed() {
   updateFinger();
 
   return false;
-  // let p5-phone manage the touch
 }
 
 
@@ -1105,88 +1346,6 @@ function mouseReleased() {
   updateFinger();
 
   return false;
-}
-
-
-// =====================================
-// STEP 3 — TEMPORARY DEBUG
-// =====================================
-
-function drawDebugReadout() {
-
-  // TEMPORARY — delete once
-  // the gesture works.
-
-  fill(240);
-
-  noStroke();
-
-  textSize(12);
-
-  textAlign(
-    LEFT,
-    TOP
-  );
-
-
-  text(
-    "rotationX " +
-    rotationX.toFixed(2),
-    12,
-    12
-  );
-
-
-  text(
-    "rotationY " +
-    rotationY.toFixed(2),
-    12,
-    30
-  );
-
-
-  text(
-    "finger " +
-    (
-      fingerHeld
-        ? "down"
-        : "up"
-    )
-    +
-    "  id "
-    +
-    (
-      trackedFingerId === null
-        ? "-"
-        : trackedFingerId
-    ),
-    12,
-    48
-  );
-
-
-  text(
-    "state " +
-    scoopState,
-    12,
-    66
-  );
-
-
-  text(
-    "successful scoops " +
-    totalScoops,
-    12,
-    84
-  );
-
-
-  // Put the main text back.
-
-  textAlign(
-    CENTER,
-    CENTER
-  );
 }
 
 
