@@ -48,9 +48,16 @@ let totalScoops = 0;
 //
 // The Burnt Orange entries are the
 // original hand-tuned colours.
-// The others were lightened from the
-// same colour using one rule:
-// lerp(original, white, 0.45).
+//
+// The other palettes take their hue
+// from their own main colour.
+// smoke / light / warm are tinted to
+// that hue so the change is actually
+// visible once alpha is applied.
+//
+// Every *Stroke value was lightened
+// from its colour with one rule:
+// lerp(colour, white, 0.45).
 //
 // Alphas live at the call sites and
 // never change.
@@ -79,57 +86,57 @@ const PALETTES = [
     name: "Dusty Lavender",
 
     main: [157, 137, 180],
-    smoke: [82, 76, 91],
-    light: [225, 220, 229],
+    smoke: [105, 80, 134],
+    light: [191, 154, 234],
 
     mainStroke: [201, 190, 214],
-    smokeStroke: [160, 157, 165],
-    lightStroke: [239, 236, 241],
+    smokeStroke: [173, 159, 188],
+    lightStroke: [220, 199, 243],
 
-    warm: [201, 191, 212],
-    warmStroke: [225, 220, 231],
+    warm: [186, 149, 228],
+    warmStroke: [217, 197, 240],
 
-    atmosphere: [217, 210, 223],
-    voidOuter: [225, 220, 229],
-    voidPoint: [225, 220, 229]
+    atmosphere: [154, 105, 211],
+    voidOuter: [191, 154, 234],
+    voidPoint: [220, 199, 243]
   },
 
   {
     name: "Mist Blue",
 
     main: [123, 158, 181],
-    smoke: [69, 79, 87],
-    light: [220, 228, 230],
+    smoke: [80, 113, 134],
+    light: [154, 202, 234],
 
     mainStroke: [182, 202, 214],
-    smokeStroke: [153, 158, 163],
-    lightStroke: [236, 240, 241],
+    smokeStroke: [159, 177, 188],
+    lightStroke: [199, 226, 243],
 
-    warm: [186, 204, 213],
-    warmStroke: [217, 227, 232],
+    warm: [149, 197, 228],
+    warmStroke: [197, 223, 240],
 
-    atmosphere: [208, 220, 224],
-    voidOuter: [220, 228, 230],
-    voidPoint: [220, 228, 230]
+    atmosphere: [105, 169, 211],
+    voidOuter: [154, 202, 234],
+    voidPoint: [199, 226, 243]
   },
 
   {
     name: "Sage Glass",
 
     main: [132, 158, 143],
-    smoke: [70, 80, 75],
-    light: [220, 226, 217],
+    smoke: [80, 134, 103],
+    light: [154, 234, 188],
 
     mainStroke: [187, 202, 193],
-    smokeStroke: [153, 159, 156],
-    lightStroke: [236, 239, 234],
+    smokeStroke: [159, 188, 171],
+    lightStroke: [199, 243, 218],
 
-    warm: [189, 202, 191],
-    warmStroke: [219, 226, 220],
+    warm: [149, 228, 183],
+    warmStroke: [197, 240, 215],
 
-    atmosphere: [209, 218, 208],
-    voidOuter: [220, 226, 217],
-    voidPoint: [220, 226, 217]
+    atmosphere: [105, 211, 150],
+    voidOuter: [154, 234, 188],
+    voidPoint: [199, 243, 218]
   }
 ];
 
@@ -1263,7 +1270,7 @@ function drawAtmosphere() {
         400,
         20,
         0,
-        10
+        28
       );
 
 
