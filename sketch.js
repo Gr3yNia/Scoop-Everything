@@ -49,15 +49,23 @@ let totalScoops = 0;
 // The Burnt Orange entries are the
 // original hand-tuned colours.
 //
-// The other palettes take their hue
-// from their own main colour.
-// smoke / light / warm are tinted to
-// that hue so the change is actually
-// visible once alpha is applied.
+// Every palette shares orange's
+// supporting colours: the translucent
+// white, the smoke grey, the warm tan
+// circle and the pale void accents.
 //
-// Every *Stroke value was lightened
-// from its colour with one rule:
-// lerp(colour, white, 0.45).
+// So each palette shows the same mix
+// as the original artwork: the colour
+// comes from main, everything else
+// stays neutral.
+//
+// Only main, mainStroke and the halo
+// change from palette to palette.
+//
+// mainStroke for the three newer
+// palettes was lightened from main:
+// lerp(main, white, 0.25).
+// Orange keeps its original stroke.
 //
 // Alphas live at the call sites and
 // never change.
@@ -86,57 +94,57 @@ const PALETTES = [
     name: "Dusty Lavender",
 
     main: [157, 137, 180],
-    smoke: [105, 80, 134],
-    light: [191, 154, 234],
+    smoke: [78, 75, 72],
+    light: [218, 214, 202],
 
-    mainStroke: [201, 190, 214],
-    smokeStroke: [173, 159, 188],
-    lightStroke: [220, 199, 243],
+    mainStroke: [182, 167, 199],
+    smokeStroke: [155, 150, 140],
+    lightStroke: [240, 236, 222],
 
-    warm: [186, 149, 228],
-    warmStroke: [217, 197, 240],
+    warm: [205, 181, 145],
+    warmStroke: [230, 214, 190],
 
     atmosphere: [154, 105, 211],
-    voidOuter: [191, 154, 234],
-    voidPoint: [220, 199, 243]
+    voidOuter: [220, 211, 195],
+    voidPoint: [225, 214, 195]
   },
 
   {
     name: "Mist Blue",
 
     main: [123, 158, 181],
-    smoke: [80, 113, 134],
-    light: [154, 202, 234],
+    smoke: [78, 75, 72],
+    light: [218, 214, 202],
 
-    mainStroke: [182, 202, 214],
-    smokeStroke: [159, 177, 188],
-    lightStroke: [199, 226, 243],
+    mainStroke: [156, 182, 200],
+    smokeStroke: [155, 150, 140],
+    lightStroke: [240, 236, 222],
 
-    warm: [149, 197, 228],
-    warmStroke: [197, 223, 240],
+    warm: [205, 181, 145],
+    warmStroke: [230, 214, 190],
 
     atmosphere: [105, 169, 211],
-    voidOuter: [154, 202, 234],
-    voidPoint: [199, 226, 243]
+    voidOuter: [220, 211, 195],
+    voidPoint: [225, 214, 195]
   },
 
   {
     name: "Sage Glass",
 
     main: [132, 158, 143],
-    smoke: [80, 134, 103],
-    light: [154, 234, 188],
+    smoke: [78, 75, 72],
+    light: [218, 214, 202],
 
-    mainStroke: [187, 202, 193],
-    smokeStroke: [159, 188, 171],
-    lightStroke: [199, 243, 218],
+    mainStroke: [163, 182, 171],
+    smokeStroke: [155, 150, 140],
+    lightStroke: [240, 236, 222],
 
-    warm: [149, 228, 183],
-    warmStroke: [197, 240, 215],
+    warm: [205, 181, 145],
+    warmStroke: [230, 214, 190],
 
     atmosphere: [105, 211, 150],
-    voidOuter: [154, 234, 188],
-    voidPoint: [199, 243, 218]
+    voidOuter: [220, 211, 195],
+    voidPoint: [225, 214, 195]
   }
 ];
 
