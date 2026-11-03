@@ -1,103 +1,115 @@
 
-// ==========================================
-// SCOOP EVERYTHING
-// Continuous Scoop Research — Version 2
-// ==========================================
+/*
+ * SCOOP EVERYTHING
+ * Continuous Scoop Research — V3
+ *
+ * One finger may stay on the screen for
+ * multiple consecutive scoops.
+ *
+ * Requires:
+ * - p5.js
+ * - p5-phone 1.15.2
+ *
+ * CSV research data is kept in memory
+ * until exported or the page is closed.
+ */
 
-// p5-phone controls window.sensorsEnabled.
-// Do not declare another sensorsEnabled variable.
+// ========================================
+// CONFIGURATION
+// ========================================
 
-let button;
+const SCOOP = {
+  // Relative angular movement in radians.
+  dip: 0.30,
 
-// ==========================================
-// FINGER TRACKING
-// ==========================================
+  // Required return movement after a dip.
+  reversal: 0.15,
+
+  // Required new downward movement to
+  // rearm after a successful scoop.
+  rearm: 0.12,
+
+  // Minimum time between dip and reversal.
+  minMs: 140,
+
+  // Maximum time allowed for a scoop.
+  maxMs: 4500,
+
+  // Prevent multiple counts from one scoop.
+  cooldownMs: 320,
+
+  // Motion smoothing: 0 to 1.
+  smoothing: 0.25
+};
+
+// ========================================
+// GLOBAL VARIABLES
+// ========================================
+
+let sensorButton;
 
 let trackedFingerId = null;
 let fingerHeld = false;
 let touchesWereEmpty = true;
 
-// ==========================================
-// CONTINUOUS SCOOP RECOGNITION
-// ==========================================
-
-// Experimental thresholds in radians.
-// These will be adjusted using research data.
-
-const SCOOP = {
-  dip: 0.30,
-  reversal: 0.15,
-  rearm: 0.12,
-  minMs: 140,
-  maxMs: 4500,
-  cooldownMs: 320,
-  smoothing: 0.25
-};
-
 let scoopState = "waiting";
+let gesture = null;
 let totalScoops = 0;
 
-let gesture = null;
-
-let lastMotionAt = 0;
 let lastFilteredX = null;
+let lastMotionAt = 0;
 let motionSpeedX = 0;
 
-// ==========================================
-// RESEARCH DATA
-// ==========================================
-
+// Research variables.
 let researchOn = false;
 let researchRows = [];
-let researchPanel;
-
+let researchPanel = null;
 let researchSession = 0;
 let researchCycle = 0;
-
 let researchLastSample = 0;
 let researchStartedAt = 0;
 
-// ==========================================
-// ARTWORK
-// ==========================================
-
+// Artwork variables.
 let artworkActive = false;
 let fragments = [];
-
 let rotationNow = 0;
 let spreadNow = 1;
 
-// ==========================================
+// ========================================
 // SETUP
-// ==========================================
+// ========================================
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
 
-  textAlign(CENTER, CENTER);
+  // p5-phone uses window.sensorsEnabled.
+  // Do not redeclare sensorsEnabled.
 
-  button = createButton("Enable Motion Sensors");
-  button.id("enable-sensors");
+  sensorButton = createButton(
+    "Enable Motion Sensors"
+  );
 
-  button.position(
+  sensorButton.id("enable-sensors");
+
+  sensorButton.position(
     width / 2 - 90,
     height / 2 - 25
   );
 
-  button.size(180, 50);
+  sensorButton.size(180, 50);
 
   enableSensorOn("#enable-sensors");
   lockGestures();
 
-  // Keep p5's default angle mode (radians).
-
   createFragments();
   setupResearchPanel();
+
+  textAlign(CENTER, CENTER);
 }
 
-// ==========================================
-// DRAW
-// ==========================================
+// ========================================
+// MAIN DRAW LOOP
+// ========================================
 
 function draw() {
   background(14, 14, 15);
@@ -106,6 +118,7 @@ function draw() {
     fill(240);
     noStroke();
     textSize(18);
+    textAlign(CENTER, CENTER);
 
     text(
       "Tap the button to start",
@@ -116,8 +129,8 @@ function draw() {
     return;
   }
 
-  if (button) {
-    button.hide();
+  if (sensorButton) {
+    sensorButton.hide();
   }
 
   updateFinger();
@@ -130,6 +143,7 @@ function draw() {
     fill(225);
     noStroke();
     textSize(18);
+    textAlign(CENTER, CENTER);
 
     text(
       "Hold + Scoop!",
@@ -141,9 +155,9 @@ function draw() {
   drawDebugReadout();
 }
 
-// ==========================================
-// CONTINUOUS SCOOP DETECTOR
-// ==========================================
+// ========================================
+// CONTINUOUS SCOOP DETECTION
+// ========================================
 
 function updateScoopGesture() {
   const now = performance.now();
@@ -153,24 +167,19 @@ function updateScoopGesture() {
     return;
   }
 
-  // Finger release ends the current hold,
-  // but is not required between scoops.
+  // Finger release ends the current hold.
+  // It is NOT required between scoops.
 
   if (!fingerHeld) {
-    if (gesture) {
-      researchEvent("finger_up");
-    }
-
     gesture = null;
     scoopState = "waiting";
     lastFilteredX = null;
     lastMotionAt = 0;
     motionSpeedX = 0;
-
     return;
   }
 
-  // Smooth X rotation to reduce sensor noise.
+  // Smooth the X-axis rotation.
 
   const dt = lastMotionAt
     ? (now - lastMotionAt) / 1000
@@ -180,9 +189,12 @@ function updateScoopGesture() {
 
   const filtered = previous === null
     ? x
-    : previous + SCOOP.smoothing * (x - previous);
+    : previous +
+      SCOOP.smoothing * (x - previous);
 
   // Approximate angular velocity.
+  // This is derived from rotationX,
+  // not a raw gyroscope measurement.
 
   motionSpeedX =
     dt > 0.005 &&
@@ -194,49 +206,44 @@ function updateScoopGesture() {
   lastFilteredX = filtered;
   lastMotionAt = now;
 
-  // First frame of a continuous finger hold.
+  // Create a gesture only once per
+  // continuous finger hold.
 
   if (!gesture) {
     gesture = {
       baseline: filtered,
       minX: filtered,
+      maxX: filtered,
       start: now,
       lastSuccess: -Infinity,
-      cycle: 0
+      cycle: 0,
+      reversalPeak: filtered
     };
 
     scoopState = "ready";
+
     researchEvent("hold_started");
+
+    return;
   }
 
   const g = gesture;
 
-  // --------------------------------------
+  // ------------------------------------
   // READY
-  // --------------------------------------
+  // Track a local high point, then dip.
+  // ------------------------------------
 
   if (scoopState === "ready") {
+    g.maxX = Math.max(
+      g.maxX,
+      filtered
+    );
 
-    // Slowly adjust the resting baseline
-    // when the phone is nearly stationary.
-
-    if (Math.abs(motionSpeedX) < 0.13) {
-      g.baseline +=
-        0.015 * (filtered - g.baseline);
-    }
-
-    // Allow a higher resting angle.
-
-    if (filtered > g.baseline) {
-      g.baseline = filtered;
-    }
-
-    // Detect downward motion relative
-    // to the player's starting angle.
+    g.baseline = g.maxX;
 
     if (
-      g.baseline - filtered >= SCOOP.dip &&
-      now - g.lastSuccess >= SCOOP.cooldownMs
+      g.maxX - filtered >= SCOOP.dip
     ) {
       g.minX = filtered;
       g.start = now;
@@ -247,40 +254,54 @@ function updateScoopGesture() {
     }
   }
 
-  // --------------------------------------
+  // ------------------------------------
   // DIPPED
-  // --------------------------------------
+  // Track the low point and reversal.
+  // ------------------------------------
 
   else if (scoopState === "dipped") {
+    g.minX = Math.min(
+      g.minX,
+      filtered
+    );
 
-    // Track the deepest point.
+    // If a movement is abandoned,
+    // restart from the current position.
 
-    g.minX = Math.min(g.minX, filtered);
-
-    // Cancel an abandoned movement.
-
-    if (now - g.start > SCOOP.maxMs) {
+    if (
+      now - g.start > SCOOP.maxMs
+    ) {
       researchEvent(
         "dip_timeout",
         "incomplete"
       );
 
-      scoopState = "rearm";
+      g.maxX = filtered;
+      g.baseline = filtered;
+      g.minX = filtered;
+
+      scoopState = "ready";
     }
 
-    // Detect reversal toward the
-    // original starting position.
+    // A scoop succeeds when the phone
+    // reverses sufficiently after dipping.
 
     else if (
-      filtered - g.minX >= SCOOP.reversal &&
-      now - g.start >= SCOOP.minMs &&
-      motionSpeedX > 0.03
+      filtered - g.minX >=
+        SCOOP.reversal &&
+
+      now - g.start >=
+        SCOOP.minMs &&
+
+      motionSpeedX > 0.03 &&
+
+      now - g.lastSuccess >=
+        SCOOP.cooldownMs
     ) {
       addScoop();
 
       g.lastSuccess = now;
       g.cycle++;
-
       researchCycle++;
 
       researchEvent(
@@ -288,59 +309,85 @@ function updateScoopGesture() {
         "recognized"
       );
 
-      // Do not immediately recognize
-      // another scoop.
+      // Do not require returning to
+      // the original starting angle.
+
+      g.reversalPeak = filtered;
 
       scoopState = "rearm";
     }
   }
 
-  // --------------------------------------
+  // ------------------------------------
   // REARM
-  // --------------------------------------
+  // Wait for a fresh downward movement.
+  // ------------------------------------
 
   else if (scoopState === "rearm") {
+    // Track the local high point
+    // after the previous scoop.
 
-    // The finger stays on the screen.
-    //
-    // The phone must return close to
-    // its starting angle before the
-    // next scoop can begin.
+    g.reversalPeak = Math.max(
+      g.reversalPeak,
+      filtered
+    );
+
+    // A new downward movement indicates
+    // that the player has begun another
+    // scoop, even if the finger remains
+    // on the screen.
 
     if (
-      filtered >= g.baseline - SCOOP.rearm &&
-      now - g.lastSuccess >= SCOOP.cooldownMs
+      now - g.lastSuccess >=
+        SCOOP.cooldownMs &&
+
+      g.reversalPeak - filtered >=
+        SCOOP.rearm
     ) {
-      g.baseline = filtered;
+      g.maxX = g.reversalPeak;
+      g.baseline = g.maxX;
       g.minX = filtered;
+      g.start = now;
 
-      scoopState = "ready";
+      if (
+        g.maxX - filtered >=
+          SCOOP.dip
+      ) {
+        scoopState = "dipped";
 
-      researchEvent("rearmed");
+        researchEvent(
+          "dip_detected"
+        );
+      } else {
+        scoopState = "ready";
+
+        researchEvent(
+          "rearmed"
+        );
+      }
     }
   }
 }
 
-// ==========================================
-// ADD ONE SCOOP
-// ==========================================
+// ========================================
+// SCOOP SUCCESS
+// ========================================
 
 function addScoop() {
   totalScoops++;
 
   artworkActive = true;
 
-  // Generate a new artwork for each scoop.
-
+  // Create a new visual composition.
   createFragments();
 
   rotationNow = 0;
   spreadNow = 1;
 }
 
-// ==========================================
-// CREATE FRAGMENTS
-// ==========================================
+// ========================================
+// GENERATE KALEIDOSCOPE FRAGMENTS
+// ========================================
 
 function createFragments() {
   fragments = [];
@@ -364,19 +411,19 @@ function createFragments() {
   }
 }
 
-// ==========================================
+// ========================================
 // DRAW KALEIDOSCOPE
-// ==========================================
+// ========================================
 
 function drawArtwork() {
   let targetRotation = rotationNow;
   let targetSpread = spreadNow;
 
   // When the finger is lifted,
-  // tilting controls the artwork.
+  // phone tilting manipulates the artwork.
   //
   // When the finger is held,
-  // the scoop detector takes over.
+  // motion is used for scoop recognition.
 
   if (!fingerHeld) {
     targetRotation = constrain(
@@ -418,7 +465,11 @@ function drawArtwork() {
 
   const sections = 6;
 
-  for (let i = 0; i < sections; i++) {
+  for (
+    let i = 0;
+    i < sections;
+    i++
+  ) {
     push();
 
     rotate(
@@ -427,8 +478,6 @@ function drawArtwork() {
     );
 
     drawFragmentGroup(i);
-
-    // Mirrored fragments.
 
     scale(1, -1);
     drawFragmentGroup(i);
@@ -442,6 +491,7 @@ function drawArtwork() {
 
   fill(240, 220);
   noStroke();
+
   textSize(14);
   textAlign(CENTER, CENTER);
 
@@ -452,15 +502,19 @@ function drawArtwork() {
   );
 }
 
-// ==========================================
-// FRAGMENT GROUP
-// ==========================================
+// ========================================
+// DRAW FRAGMENT GROUP
+// ========================================
 
 function drawFragmentGroup(section) {
   const maxRadius =
     min(width, height) * 0.38;
 
-  for (let i = 0; i < fragments.length; i++) {
+  for (
+    let i = 0;
+    i < fragments.length;
+    i++
+  ) {
     const f = fragments[i];
 
     push();
@@ -495,15 +549,14 @@ function drawFragmentGroup(section) {
   }
 }
 
-// ==========================================
-// FRAGMENT SHAPES
-// ==========================================
+// ========================================
+// DRAW INDIVIDUAL FRAGMENTS
+// ========================================
 
 function drawFragment(type, s) {
   strokeWeight(0.8);
 
   if (type === 0) {
-
     // Burnt orange glass.
 
     fill(
@@ -545,8 +598,7 @@ function drawFragment(type, s) {
   }
 
   else if (type === 1) {
-
-    // Warm translucent white.
+    // Translucent white glass.
 
     fill(
       218, 214, 202, 55
@@ -587,8 +639,7 @@ function drawFragment(type, s) {
   }
 
   else if (type === 2) {
-
-    // Smoke glass.
+    // Smoke-coloured glass.
 
     fill(
       78, 75, 72, 125
@@ -611,8 +662,7 @@ function drawFragment(type, s) {
   }
 
   else {
-
-    // Small circular fragment.
+    // Circular fragment.
 
     fill(
       205, 181, 145, 75
@@ -630,9 +680,9 @@ function drawFragment(type, s) {
   }
 }
 
-// ==========================================
-// BACKGROUND ATMOSPHERE
-// ==========================================
+// ========================================
+// DRAW BACKGROUND ATMOSPHERE
+// ========================================
 
 function drawAtmosphere() {
   noStroke();
@@ -665,14 +715,12 @@ function drawAtmosphere() {
   }
 }
 
-// ==========================================
-// CENTRAL VOID
-// ==========================================
+// ========================================
+// DRAW CENTRAL VOID
+// ========================================
 
 function drawVoid() {
   push();
-
-  // Outer circle.
 
   noFill();
 
@@ -688,8 +736,6 @@ function drawVoid() {
     105
   );
 
-  // Orange inner circle.
-
   stroke(
     186, 91, 45, 150
   );
@@ -699,8 +745,6 @@ function drawVoid() {
     0,
     70
   );
-
-  // Dark centre.
 
   noStroke();
 
@@ -713,8 +757,6 @@ function drawVoid() {
     0,
     48
   );
-
-  // Tiny central point.
 
   fill(
     225, 214, 195
@@ -729,31 +771,45 @@ function drawVoid() {
   pop();
 }
 
-// ==========================================
+// ========================================
 // FINGER TRACKING
-// ==========================================
+// ========================================
 
 function updateFinger() {
-  const empty = touches.length === 0;
+  const empty =
+    touches.length === 0;
 
-  if (trackedFingerId === null) {
+  if (
+    trackedFingerId === null
+  ) {
+    if (
+      !empty &&
+      touchesWereEmpty
+    ) {
+      trackedFingerId =
+        touches[0].id;
 
-    if (!empty && touchesWereEmpty) {
-      trackedFingerId = touches[0].id;
       fingerHeld = true;
 
       researchSession++;
 
-      researchEvent("finger_down");
+      researchEvent(
+        "finger_down"
+      );
     }
   }
 
   else {
     let stillDown = false;
 
-    for (let i = 0; i < touches.length; i++) {
+    for (
+      let i = 0;
+      i < touches.length;
+      i++
+    ) {
       if (
-        touches[i].id === trackedFingerId
+        touches[i].id ===
+        trackedFingerId
       ) {
         stillDown = true;
         break;
@@ -761,7 +817,9 @@ function updateFinger() {
     }
 
     if (!stillDown) {
-      researchEvent("finger_released");
+      researchEvent(
+        "finger_released"
+      );
 
       trackedFingerId = null;
       fingerHeld = false;
@@ -769,16 +827,20 @@ function updateFinger() {
       scoopState = "waiting";
       gesture = null;
       lastFilteredX = null;
+      lastMotionAt = 0;
+      motionSpeedX = 0;
     }
   }
 
-  fingerHeld = trackedFingerId !== null;
+  fingerHeld =
+    trackedFingerId !== null;
+
   touchesWereEmpty = empty;
 }
 
-// ==========================================
+// ========================================
 // TOUCH CALLBACKS
-// ==========================================
+// ========================================
 
 function mousePressed() {
   updateFinger();
@@ -790,9 +852,9 @@ function mouseReleased() {
   return false;
 }
 
-// ==========================================
-// DEBUG INFORMATION
-// ==========================================
+// ========================================
+// LIVE DEBUG INFORMATION
+// ========================================
 
 function drawDebugReadout() {
   fill(240);
@@ -801,23 +863,35 @@ function drawDebugReadout() {
   textSize(12);
   textAlign(LEFT, TOP);
 
+  const xText =
+    Number.isFinite(rotationX)
+      ? rotationX.toFixed(2)
+      : "-";
+
+  const yText =
+    Number.isFinite(rotationY)
+      ? rotationY.toFixed(2)
+      : "-";
+
   text(
-    "rotationX " +
-    rotationX.toFixed(2),
+    "rotationX " + xText,
     12,
     12
   );
 
   text(
-    "rotationY " +
-    rotationY.toFixed(2),
+    "rotationY " + yText,
     12,
     30
   );
 
   text(
     "finger " +
-    (fingerHeld ? "down" : "up") +
+    (
+      fingerHeld
+        ? "down"
+        : "up"
+    ) +
     "  id " +
     (
       trackedFingerId === null
@@ -844,9 +918,9 @@ function drawDebugReadout() {
   textAlign(CENTER, CENTER);
 }
 
-// ==========================================
+// ========================================
 // WINDOW RESIZE
-// ==========================================
+// ========================================
 
 function windowResized() {
   resizeCanvas(
@@ -854,17 +928,17 @@ function windowResized() {
     windowHeight
   );
 
-  if (button) {
-    button.position(
+  if (sensorButton) {
+    sensorButton.position(
       width / 2 - 90,
       height / 2 - 25
     );
   }
 }
 
-// ==========================================
+// ========================================
 // RESEARCH PANEL
-// ==========================================
+// ========================================
 
 function setupResearchPanel() {
   researchPanel =
@@ -881,7 +955,10 @@ function setupResearchPanel() {
     "align-items:flex-end;" +
     "font:12px system-ui,sans-serif";
 
-  function makeButton(label, fn) {
+  function makeButton(
+    label,
+    fn
+  ) {
     const b =
       document.createElement("button");
 
@@ -896,12 +973,17 @@ function setupResearchPanel() {
       "color:#111;" +
       "touch-action:manipulation";
 
-    for (const type of [
-      "pointerdown",
-      "touchstart",
-      "touchend",
-      "mousedown"
-    ]) {
+    // Prevent research-panel touches
+    // from interfering with the game.
+
+    for (
+      const type of [
+        "pointerdown",
+        "touchstart",
+        "touchend",
+        "mousedown"
+      ]
+    ) {
       b.addEventListener(
         type,
         e => e.stopPropagation(),
@@ -922,15 +1004,17 @@ function setupResearchPanel() {
     return b;
   }
 
-  // --------------------------------------
-  // START / STOP RECORDING
-  // --------------------------------------
+  // ------------------------------------
+  // START / STOP
+  // ------------------------------------
 
   makeButton(
     "Start recording",
     b => {
       if (researchOn) {
-        researchEvent("recording_stopped");
+        researchEvent(
+          "recording_stopped"
+        );
 
         researchOn = false;
 
@@ -939,10 +1023,13 @@ function setupResearchPanel() {
       }
 
       else {
-        if (!window.sensorsEnabled) {
+        if (
+          !window.sensorsEnabled
+        ) {
           alert(
             "Enable motion sensors first."
           );
+
           return;
         }
 
@@ -963,18 +1050,18 @@ function setupResearchPanel() {
     }
   );
 
-  // --------------------------------------
+  // ------------------------------------
   // EXPORT CSV
-  // --------------------------------------
+  // ------------------------------------
 
   makeButton(
     "Export CSV",
     exportResearchCSV
   );
 
-  // --------------------------------------
-  // CLEAR RESEARCH DATA
-  // --------------------------------------
+  // ------------------------------------
+  // CLEAR DATA
+  // ------------------------------------
 
   makeButton(
     "Clear data",
@@ -996,9 +1083,9 @@ function setupResearchPanel() {
   );
 }
 
-// ==========================================
-// RECORD RESEARCH EVENT
-// ==========================================
+// ========================================
+// RESEARCH EVENT
+// ========================================
 
 function researchEvent(
   eventName,
@@ -1017,9 +1104,9 @@ function researchEvent(
   );
 }
 
-// ==========================================
-// CREATE RESEARCH ROW
-// ==========================================
+// ========================================
+// RESEARCH ROW
+// ========================================
 
 function researchRow(
   kind,
@@ -1041,7 +1128,8 @@ function researchRow(
     y: rotationY,
 
     z:
-      typeof rotationZ === "number"
+      typeof rotationZ ===
+      "number"
         ? rotationZ
         : "",
 
@@ -1069,9 +1157,9 @@ function researchRow(
   };
 }
 
-// ==========================================
-// RECORD MOTION SAMPLES
-// ==========================================
+// ========================================
+// RESEARCH MOTION SAMPLES
+// ========================================
 
 function recordResearchSample() {
   if (
@@ -1083,10 +1171,11 @@ function recordResearchSample() {
 
   const now = performance.now();
 
-  // Approximately 20 samples per second.
+  // About 20 samples per second.
 
   if (
-    now - researchLastSample < 50
+    now - researchLastSample <
+    50
   ) {
     return;
   }
@@ -1094,19 +1183,24 @@ function recordResearchSample() {
   researchLastSample = now;
 
   researchRows.push(
-    researchRow("sample")
+    researchRow(
+      "sample"
+    )
   );
 }
 
-// ==========================================
+// ========================================
 // EXPORT RESEARCH CSV
-// ==========================================
+// ========================================
 
 function exportResearchCSV() {
-  if (!researchRows.length) {
+  if (
+    !researchRows.length
+  ) {
     alert(
       "No research data recorded yet."
     );
+
     return;
   }
 
@@ -1131,17 +1225,19 @@ function exportResearchCSV() {
   const csv = [
     columns.join(","),
 
-    ...researchRows.map(row =>
-      columns.map(key =>
-        '"' +
-        String(
-          row[key] ?? ""
-        ).replace(
-          /"/g,
-          '""'
-        ) +
-        '"'
-      ).join(",")
+    ...researchRows.map(
+      row =>
+        columns.map(
+          key =>
+            '"' +
+            String(
+              row[key] ?? ""
+            ).replace(
+              /"/g,
+              '""'
+            ) +
+            '"'
+        ).join(",")
     )
   ].join("\r\n");
 
@@ -1154,18 +1250,25 @@ function exportResearchCSV() {
   );
 
   const url =
-    URL.createObjectURL(blob);
+    URL.createObjectURL(
+      blob
+    );
 
   const link =
-    document.createElement("a");
+    document.createElement(
+      "a"
+    );
 
   link.href = url;
 
   link.download =
-    "scoop-continuous-" +
+    "scoop-continuous-v3-" +
     new Date()
       .toISOString()
-      .replace(/[:.]/g, "-") +
+      .replace(
+        /[:.]/g,
+        "-"
+      ) +
     ".csv";
 
   document.body.appendChild(
@@ -1176,7 +1279,10 @@ function exportResearchCSV() {
   link.remove();
 
   setTimeout(
-    () => URL.revokeObjectURL(url),
+    () =>
+      URL.revokeObjectURL(
+        url
+      ),
     1000
   );
 }
