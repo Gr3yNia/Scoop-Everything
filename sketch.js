@@ -1,49 +1,79 @@
 
 // ==========================================
 // SCOOP EVERYTHING
-// Phase 2 — Gesture Research Prototype
-// p5.js 2.2.3 + p5-phone 1.15.2
+// Continuous Scoop Research — Version 2
 // ==========================================
 
-// SENSOR PERMISSION
+// p5-phone controls window.sensorsEnabled.
+// Do not declare another sensorsEnabled variable.
+
 let button;
 
-// TOUCH TRACKING
+// ==========================================
+// FINGER TRACKING
+// ==========================================
+
 let trackedFingerId = null;
 let fingerHeld = false;
 let touchesWereEmpty = true;
 
-// SCOOP RECOGNITION
-// Keep original tested thresholds.
-let scoopTrigger = -0.7;
-let resetTrigger = -0.3;
+// ==========================================
+// CONTINUOUS SCOOP RECOGNITION
+// ==========================================
+
+// Experimental thresholds in radians.
+// These will be adjusted using research data.
+
+const SCOOP = {
+  dip: 0.30,
+  reversal: 0.15,
+  rearm: 0.12,
+  minMs: 140,
+  maxMs: 4500,
+  cooldownMs: 320,
+  smoothing: 0.25
+};
 
 let scoopState = "waiting";
 let totalScoops = 0;
 
-// KALEIDOSCOPE
-let artworkActive = false;
-let fragments = [];
-let rotationNow = 0;
-let spreadNow = 1;
+let gesture = null;
 
-// RESEARCH
+let lastMotionAt = 0;
+let lastFilteredX = null;
+let motionSpeedX = 0;
+
+// ==========================================
+// RESEARCH DATA
+// ==========================================
+
 let researchOn = false;
 let researchRows = [];
-let researchAttempt = null;
-let researchAttemptNumber = 0;
-let researchLastSample = 0;
-let researchLastX = null;
-let researchLastT = null;
 let researchPanel;
+
+let researchSession = 0;
+let researchCycle = 0;
+
+let researchLastSample = 0;
+let researchStartedAt = 0;
+
+// ==========================================
+// ARTWORK
+// ==========================================
+
+let artworkActive = false;
+let fragments = [];
+
+let rotationNow = 0;
+let spreadNow = 1;
 
 // ==========================================
 // SETUP
 // ==========================================
 
 function setup() {
-
   createCanvas(windowWidth, windowHeight);
+
   textAlign(CENTER, CENTER);
 
   button = createButton("Enable Motion Sensors");
@@ -59,9 +89,9 @@ function setup() {
   enableSensorOn("#enable-sensors");
   lockGestures();
 
-  // Keep radians for existing thresholds.
-  createFragments();
+  // Keep p5's default angle mode (radians).
 
+  createFragments();
   setupResearchPanel();
 }
 
@@ -70,11 +100,9 @@ function setup() {
 // ==========================================
 
 function draw() {
-
   background(14, 14, 15);
 
   if (!window.sensorsEnabled) {
-
     fill(240);
     noStroke();
     textSize(18);
@@ -88,18 +116,17 @@ function draw() {
     return;
   }
 
-  if (button) button.hide();
+  if (button) {
+    button.hide();
+  }
 
   updateFinger();
   updateScoopGesture();
   recordResearchSample();
 
   if (artworkActive) {
-
     drawArtwork();
-
   } else {
-
     fill(225);
     noStroke();
     textSize(18);
@@ -115,75 +142,196 @@ function draw() {
 }
 
 // ==========================================
-// SCOOP RECOGNITION
-// ==========================================
-// waiting -> ready -> dipped -> complete
-//
-// Finger must stay down throughout.
-// A new scoop requires finger release.
+// CONTINUOUS SCOOP DETECTOR
 // ==========================================
 
 function updateScoopGesture() {
+  const now = performance.now();
+  const x = rotationX;
+
+  if (!Number.isFinite(x)) {
+    return;
+  }
+
+  // Finger release ends the current hold,
+  // but is not required between scoops.
 
   if (!fingerHeld) {
-
-    scoopState = "waiting";
-    return;
-  }
-
-  // CLEAN START
-  if (scoopState === "waiting") {
-
-    if (rotationX > resetTrigger) {
-
-      scoopState = "ready";
-      researchTransition("ready");
+    if (gesture) {
+      researchEvent("finger_up");
     }
 
+    gesture = null;
+    scoopState = "waiting";
+    lastFilteredX = null;
+    lastMotionAt = 0;
+    motionSpeedX = 0;
+
     return;
   }
 
-  // DIP
+  // Smooth X rotation to reduce sensor noise.
+
+  const dt = lastMotionAt
+    ? (now - lastMotionAt) / 1000
+    : 0;
+
+  const previous = lastFilteredX;
+
+  const filtered = previous === null
+    ? x
+    : previous + SCOOP.smoothing * (x - previous);
+
+  // Approximate angular velocity.
+
+  motionSpeedX =
+    dt > 0.005 &&
+    dt < 0.25 &&
+    previous !== null
+      ? (filtered - previous) / dt
+      : 0;
+
+  lastFilteredX = filtered;
+  lastMotionAt = now;
+
+  // First frame of a continuous finger hold.
+
+  if (!gesture) {
+    gesture = {
+      baseline: filtered,
+      minX: filtered,
+      start: now,
+      lastSuccess: -Infinity,
+      cycle: 0
+    };
+
+    scoopState = "ready";
+    researchEvent("hold_started");
+  }
+
+  const g = gesture;
+
+  // --------------------------------------
+  // READY
+  // --------------------------------------
+
   if (scoopState === "ready") {
 
-    if (rotationX < scoopTrigger) {
+    // Slowly adjust the resting baseline
+    // when the phone is nearly stationary.
+
+    if (Math.abs(motionSpeedX) < 0.13) {
+      g.baseline +=
+        0.015 * (filtered - g.baseline);
+    }
+
+    // Allow a higher resting angle.
+
+    if (filtered > g.baseline) {
+      g.baseline = filtered;
+    }
+
+    // Detect downward motion relative
+    // to the player's starting angle.
+
+    if (
+      g.baseline - filtered >= SCOOP.dip &&
+      now - g.lastSuccess >= SCOOP.cooldownMs
+    ) {
+      g.minX = filtered;
+      g.start = now;
 
       scoopState = "dipped";
-      researchTransition("dipped");
-    }
 
-    return;
+      researchEvent("dip_detected");
+    }
   }
 
-  // RETURN
-  if (scoopState === "dipped") {
+  // --------------------------------------
+  // DIPPED
+  // --------------------------------------
 
-    if (rotationX > resetTrigger) {
+  else if (scoopState === "dipped") {
 
+    // Track the deepest point.
+
+    g.minX = Math.min(g.minX, filtered);
+
+    // Cancel an abandoned movement.
+
+    if (now - g.start > SCOOP.maxMs) {
+      researchEvent(
+        "dip_timeout",
+        "incomplete"
+      );
+
+      scoopState = "rearm";
+    }
+
+    // Detect reversal toward the
+    // original starting position.
+
+    else if (
+      filtered - g.minX >= SCOOP.reversal &&
+      now - g.start >= SCOOP.minMs &&
+      motionSpeedX > 0.03
+    ) {
       addScoop();
 
-      scoopState = "complete";
-      researchTransition("success");
-    }
+      g.lastSuccess = now;
+      g.cycle++;
 
-    return;
+      researchCycle++;
+
+      researchEvent(
+        "scoop_success",
+        "recognized"
+      );
+
+      // Do not immediately recognize
+      // another scoop.
+
+      scoopState = "rearm";
+    }
   }
 
-  // COMPLETE:
-  // Wait for finger release.
+  // --------------------------------------
+  // REARM
+  // --------------------------------------
+
+  else if (scoopState === "rearm") {
+
+    // The finger stays on the screen.
+    //
+    // The phone must return close to
+    // its starting angle before the
+    // next scoop can begin.
+
+    if (
+      filtered >= g.baseline - SCOOP.rearm &&
+      now - g.lastSuccess >= SCOOP.cooldownMs
+    ) {
+      g.baseline = filtered;
+      g.minX = filtered;
+
+      scoopState = "ready";
+
+      researchEvent("rearmed");
+    }
+  }
 }
 
 // ==========================================
-// SUCCESSFUL SCOOP
+// ADD ONE SCOOP
 // ==========================================
 
 function addScoop() {
-
   totalScoops++;
 
   artworkActive = true;
 
-  // One scoop generates one new artwork.
+  // Generate a new artwork for each scoop.
+
   createFragments();
 
   rotationNow = 0;
@@ -191,21 +339,16 @@ function addScoop() {
 }
 
 // ==========================================
-// CREATE KALEIDOSCOPE FRAGMENTS
+// CREATE FRAGMENTS
 // ==========================================
 
 function createFragments() {
-
   fragments = [];
 
   for (let i = 0; i < 12; i++) {
-
     fragments.push({
-
       distance: random(0.25, 1),
-
       size: random(25, 85),
-
       offset: random(-28, 28),
 
       rotation: radians(
@@ -217,7 +360,6 @@ function createFragments() {
       ),
 
       type: floor(random(4))
-
     });
   }
 }
@@ -227,23 +369,22 @@ function createFragments() {
 // ==========================================
 
 function drawArtwork() {
-
   let targetRotation = rotationNow;
   let targetSpread = spreadNow;
 
-  // Finger up: move artwork with phone.
-  // Finger down: hold artwork and scoop.
+  // When the finger is lifted,
+  // tilting controls the artwork.
+  //
+  // When the finger is held,
+  // the scoop detector takes over.
 
   if (!fingerHeld) {
-
-    // Left/right tilt rotates artwork.
     targetRotation = constrain(
       rotationY * 0.45,
       -0.45,
       0.45
     );
 
-    // Forward/back tilt changes spread.
     targetSpread = map(
       rotationX,
       -0.6,
@@ -278,7 +419,6 @@ function drawArtwork() {
   const sections = 6;
 
   for (let i = 0; i < sections; i++) {
-
     push();
 
     rotate(
@@ -286,12 +426,12 @@ function drawArtwork() {
       rotationNow
     );
 
-    drawFragmentGroup();
+    drawFragmentGroup(i);
 
-    // Mirrored fragments
+    // Mirrored fragments.
+
     scale(1, -1);
-
-    drawFragmentGroup();
+    drawFragmentGroup(i);
 
     pop();
   }
@@ -316,13 +456,11 @@ function drawArtwork() {
 // FRAGMENT GROUP
 // ==========================================
 
-function drawFragmentGroup() {
-
+function drawFragmentGroup(section) {
   const maxRadius =
     min(width, height) * 0.38;
 
   for (let i = 0; i < fragments.length; i++) {
-
     const f = fragments[i];
 
     push();
@@ -332,9 +470,11 @@ function drawFragmentGroup() {
       f.distance *
       spreadNow;
 
-    const drift = sin(
-      frameCount * 0.003 + f.phase
-    ) * 4;
+    const drift =
+      sin(
+        frameCount * 0.003 +
+        f.phase
+      ) * 4;
 
     translate(
       radius + drift,
@@ -360,61 +500,127 @@ function drawFragmentGroup() {
 // ==========================================
 
 function drawFragment(type, s) {
-
   strokeWeight(0.8);
 
   if (type === 0) {
 
-    // Burnt orange glass
-    fill(186, 91, 45, 115);
-    stroke(226, 146, 100, 150);
+    // Burnt orange glass.
+
+    fill(
+      186, 91, 45, 115
+    );
+
+    stroke(
+      226, 146, 100, 150
+    );
 
     beginShape();
 
-    vertex(-s * 0.50, -s * 0.10);
-    vertex(-s * 0.15, -s * 0.45);
-    vertex(s * 0.48, -s * 0.18);
-    vertex(s * 0.30, s * 0.38);
-    vertex(-s * 0.30, s * 0.28);
+    vertex(
+      -s * 0.50,
+      -s * 0.10
+    );
+
+    vertex(
+      -s * 0.15,
+      -s * 0.45
+    );
+
+    vertex(
+      s * 0.48,
+      -s * 0.18
+    );
+
+    vertex(
+      s * 0.30,
+      s * 0.38
+    );
+
+    vertex(
+      -s * 0.30,
+      s * 0.28
+    );
 
     endShape(CLOSE);
+  }
 
-  } else if (type === 1) {
+  else if (type === 1) {
 
-    // Warm translucent white
-    fill(218, 214, 202, 55);
-    stroke(240, 236, 222, 110);
+    // Warm translucent white.
+
+    fill(
+      218, 214, 202, 55
+    );
+
+    stroke(
+      240, 236, 222, 110
+    );
 
     beginShape();
 
-    vertex(-s * 0.48, 0);
-    vertex(-s * 0.12, -s * 0.32);
-    vertex(s * 0.46, -s * 0.16);
-    vertex(s * 0.28, s * 0.28);
-    vertex(-s * 0.28, s * 0.38);
+    vertex(
+      -s * 0.48,
+      0
+    );
+
+    vertex(
+      -s * 0.12,
+      -s * 0.32
+    );
+
+    vertex(
+      s * 0.46,
+      -s * 0.16
+    );
+
+    vertex(
+      s * 0.28,
+      s * 0.28
+    );
+
+    vertex(
+      -s * 0.28,
+      s * 0.38
+    );
 
     endShape(CLOSE);
+  }
 
-  } else if (type === 2) {
+  else if (type === 2) {
 
-    // Smoke glass
-    fill(78, 75, 72, 125);
-    stroke(155, 150, 140, 80);
+    // Smoke glass.
+
+    fill(
+      78, 75, 72, 125
+    );
+
+    stroke(
+      155, 150, 140, 80
+    );
 
     triangle(
       -s * 0.45,
       s * 0.30,
+
       0,
       -s * 0.48,
+
       s * 0.45,
       s * 0.30
     );
+  }
 
-  } else {
+  else {
 
-    // Circular fragment
-    fill(205, 181, 145, 75);
-    stroke(230, 214, 190, 100);
+    // Small circular fragment.
+
+    fill(
+      205, 181, 145, 75
+    );
+
+    stroke(
+      230, 214, 190, 100
+    );
 
     circle(
       0,
@@ -429,18 +635,33 @@ function drawFragment(type, s) {
 // ==========================================
 
 function drawAtmosphere() {
-
   noStroke();
 
-  for (let d = 400; d > 20; d -= 25) {
-
+  for (
+    let d = 400;
+    d > 20;
+    d -= 25
+  ) {
     const a = map(
-      d, 400, 20, 0, 10
+      d,
+      400,
+      20,
+      0,
+      10
     );
 
-    fill(220, 205, 180, a);
+    fill(
+      220,
+      205,
+      180,
+      a
+    );
 
-    circle(0, 0, d);
+    circle(
+      0,
+      0,
+      d
+    );
   }
 }
 
@@ -449,69 +670,105 @@ function drawAtmosphere() {
 // ==========================================
 
 function drawVoid() {
-
   push();
+
+  // Outer circle.
 
   noFill();
 
-  stroke(220, 211, 195, 70);
-  strokeWeight(1);
-  circle(0, 0, 105);
+  stroke(
+    220, 211, 195, 70
+  );
 
-  stroke(186, 91, 45, 150);
-  circle(0, 0, 70);
+  strokeWeight(1);
+
+  circle(
+    0,
+    0,
+    105
+  );
+
+  // Orange inner circle.
+
+  stroke(
+    186, 91, 45, 150
+  );
+
+  circle(
+    0,
+    0,
+    70
+  );
+
+  // Dark centre.
 
   noStroke();
-  fill(10, 10, 11);
-  circle(0, 0, 48);
 
-  fill(225, 214, 195);
-  circle(0, 0, 5);
+  fill(
+    10, 10, 11
+  );
+
+  circle(
+    0,
+    0,
+    48
+  );
+
+  // Tiny central point.
+
+  fill(
+    225, 214, 195
+  );
+
+  circle(
+    0,
+    0,
+    5
+  );
 
   pop();
 }
 
 // ==========================================
-// TOUCH TRACKING
+// FINGER TRACKING
 // ==========================================
 
 function updateFinger() {
-
   const empty = touches.length === 0;
 
   if (trackedFingerId === null) {
 
-    // Only adopt a NEW touch.
     if (!empty && touchesWereEmpty) {
-
       trackedFingerId = touches[0].id;
-
       fingerHeld = true;
 
-      researchStartAttempt();
+      researchSession++;
+
+      researchEvent("finger_down");
     }
+  }
 
-  } else {
-
+  else {
     let stillDown = false;
 
     for (let i = 0; i < touches.length; i++) {
-
-      if (touches[i].id === trackedFingerId) {
-
+      if (
+        touches[i].id === trackedFingerId
+      ) {
         stillDown = true;
         break;
       }
     }
 
     if (!stillDown) {
-
-      // Record the last state before reset.
-      researchFinishAttempt();
+      researchEvent("finger_released");
 
       trackedFingerId = null;
       fingerHeld = false;
+
       scoopState = "waiting";
+      gesture = null;
+      lastFilteredX = null;
     }
   }
 
@@ -524,23 +781,20 @@ function updateFinger() {
 // ==========================================
 
 function mousePressed() {
-
   updateFinger();
   return false;
 }
 
 function mouseReleased() {
-
   updateFinger();
   return false;
 }
 
 // ==========================================
-// DEBUG DISPLAY
+// DEBUG INFORMATION
 // ==========================================
 
 function drawDebugReadout() {
-
   fill(240);
   noStroke();
 
@@ -548,278 +802,280 @@ function drawDebugReadout() {
   textAlign(LEFT, TOP);
 
   text(
-    "rotationX " + rotationX.toFixed(2),
-    12, 12
+    "rotationX " +
+    rotationX.toFixed(2),
+    12,
+    12
   );
 
   text(
-    "rotationY " + rotationY.toFixed(2),
-    12, 30
+    "rotationY " +
+    rotationY.toFixed(2),
+    12,
+    30
   );
 
   text(
     "finger " +
-    (fingerHeld ? "down" : "up"),
-    12, 48
+    (fingerHeld ? "down" : "up") +
+    "  id " +
+    (
+      trackedFingerId === null
+        ? "-"
+        : trackedFingerId
+    ),
+    12,
+    48
   );
 
   text(
     "state " + scoopState,
-    12, 66
+    12,
+    66
   );
 
   text(
-    "successful scoops " + totalScoops,
-    12, 84
+    "successful scoops " +
+    totalScoops,
+    12,
+    84
   );
 
   textAlign(CENTER, CENTER);
 }
 
 // ==========================================
-// RESEARCH CONTROL PANEL
+// WINDOW RESIZE
+// ==========================================
+
+function windowResized() {
+  resizeCanvas(
+    windowWidth,
+    windowHeight
+  );
+
+  if (button) {
+    button.position(
+      width / 2 - 90,
+      height / 2 - 25
+    );
+  }
+}
+
+// ==========================================
+// RESEARCH PANEL
 // ==========================================
 
 function setupResearchPanel() {
+  researchPanel =
+    document.createElement("div");
 
-  researchPanel = document.createElement("div");
+  researchPanel.style.cssText =
+    "position:fixed;" +
+    "right:8px;" +
+    "top:8px;" +
+    "z-index:9999;" +
+    "display:flex;" +
+    "flex-direction:column;" +
+    "gap:5px;" +
+    "align-items:flex-end;" +
+    "font:12px system-ui,sans-serif";
 
-  researchPanel.style.cssText = `
-    position: fixed;
-    top: 8px;
-    right: 8px;
-    z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    align-items: flex-end;
-    font: 12px system-ui, sans-serif;
-  `;
-
-  function makeButton(label, callback) {
-
-    const b = document.createElement("button");
+  function makeButton(label, fn) {
+    const b =
+      document.createElement("button");
 
     b.textContent = label;
 
-    b.style.cssText = `
-      padding: 8px;
-      border: 1px solid #aaa;
-      border-radius: 7px;
-      background: white;
-      color: #111;
-      font: 12px system-ui;
-      touch-action: manipulation;
-    `;
+    b.style.cssText =
+      "font:12px system-ui;" +
+      "padding:8px;" +
+      "border:1px solid #aaa;" +
+      "border-radius:7px;" +
+      "background:white;" +
+      "color:#111;" +
+      "touch-action:manipulation";
 
-    // Prevent button touches from
-    // entering the p5 scoop gesture.
-    b.addEventListener("pointerdown", e => {
-      e.stopPropagation();
-    });
+    for (const type of [
+      "pointerdown",
+      "touchstart",
+      "touchend",
+      "mousedown"
+    ]) {
+      b.addEventListener(
+        type,
+        e => e.stopPropagation(),
+        { passive: true }
+      );
+    }
 
-    b.addEventListener("click", e => {
-      e.stopPropagation();
-      callback(b);
-    });
+    b.addEventListener(
+      "click",
+      e => {
+        e.stopPropagation();
+        fn(b);
+      }
+    );
 
     researchPanel.appendChild(b);
 
     return b;
   }
 
+  // --------------------------------------
   // START / STOP RECORDING
+  // --------------------------------------
 
-  makeButton("Start recording", b => {
+  makeButton(
+    "Start recording",
+    b => {
+      if (researchOn) {
+        researchEvent("recording_stopped");
 
-    if (researchOn) {
+        researchOn = false;
 
-      researchFinishAttempt();
-      researchOn = false;
-
-      b.textContent = "Start recording";
-
-    } else {
-
-      if (!window.sensorsEnabled) {
-
-        alert("Enable motion sensors first.");
-        return;
+        b.textContent =
+          "Start recording";
       }
 
-      researchOn = true;
+      else {
+        if (!window.sensorsEnabled) {
+          alert(
+            "Enable motion sensors first."
+          );
+          return;
+        }
 
-      researchLastSample = 0;
-      researchLastT = null;
-      researchLastX = null;
+        researchOn = true;
 
-      b.textContent = "Stop recording";
+        researchStartedAt =
+          performance.now();
+
+        researchLastSample = 0;
+
+        b.textContent =
+          "Stop recording";
+
+        researchEvent(
+          "recording_started"
+        );
+      }
     }
-  });
+  );
 
+  // --------------------------------------
   // EXPORT CSV
+  // --------------------------------------
 
-  makeButton("Export CSV", () => {
+  makeButton(
+    "Export CSV",
+    exportResearchCSV
+  );
 
-    exportResearchCSV();
-  });
+  // --------------------------------------
+  // CLEAR RESEARCH DATA
+  // --------------------------------------
 
-  // CLEAR DATA
-
-  makeButton("Clear data", () => {
-
-    if (confirm("Delete recorded data?")) {
-
-      researchRows = [];
-      researchAttempt = null;
-      researchAttemptNumber = 0;
+  makeButton(
+    "Clear data",
+    () => {
+      if (
+        confirm(
+          "Delete recorded data on this page?"
+        )
+      ) {
+        researchRows = [];
+        researchCycle = 0;
+        researchSession = 0;
+      }
     }
-  });
+  );
 
-  document.body.appendChild(researchPanel);
+  document.body.appendChild(
+    researchPanel
+  );
 }
 
 // ==========================================
-// START ONE ATTEMPT
+// RECORD RESEARCH EVENT
 // ==========================================
 
-function researchStartAttempt() {
+function researchEvent(
+  eventName,
+  outcome = ""
+) {
+  if (!researchOn) {
+    return;
+  }
 
-  if (!researchOn) return;
-
-  researchAttemptNumber++;
-
-  researchLastT = null;
-  researchLastX = null;
-
-  const x = Number.isFinite(rotationX)
-    ? rotationX
-    : null;
-
-  researchAttempt = {
-
-    id: researchAttemptNumber,
-
-    start: performance.now(),
-
-    minX: x,
-    maxX: x,
-
-    ready: false,
-    dipped: false,
-    success: false
-  };
-
-  researchEvent("touch_start");
+  researchRows.push(
+    researchRow(
+      "event",
+      eventName,
+      outcome
+    )
+  );
 }
 
 // ==========================================
-// RECOGNITION EVENTS
+// CREATE RESEARCH ROW
 // ==========================================
 
-function researchTransition(eventName) {
+function researchRow(
+  kind,
+  event = "",
+  outcome = ""
+) {
+  return {
+    kind,
 
-  if (!researchOn || !researchAttempt) return;
-
-  if (eventName === "ready") {
-    researchAttempt.ready = true;
-  }
-
-  if (eventName === "dipped") {
-    researchAttempt.dipped = true;
-  }
-
-  if (eventName === "success") {
-    researchAttempt.success = true;
-  }
-
-  researchEvent(eventName);
-}
-
-// ==========================================
-// FINISH ATTEMPT
-// ==========================================
-
-function researchFinishAttempt() {
-
-  if (!researchAttempt) return;
-
-  const a = researchAttempt;
-
-  let outcome;
-
-  if (a.success) {
-
-    outcome = "recognized";
-
-  } else if (a.dipped) {
-
-    outcome = "dipped_no_return";
-
-  } else if (a.ready) {
-
-    outcome = "not_deep_enough";
-
-  } else {
-
-    outcome = "invalid_start";
-  }
-
-  researchEvent("touch_end", outcome);
-
-  researchAttempt = null;
-}
-
-// ==========================================
-// RECORD EVENT
-// ==========================================
-
-function researchEvent(eventName, outcome = "") {
-
-  if (!researchOn || !researchAttempt) return;
-
-  const a = researchAttempt;
-
-  researchRows.push({
-
-    kind: "event",
-
-    attempt: a.id,
+    session: researchSession,
+    cycle: researchCycle,
 
     ms: Math.round(
-      performance.now() - a.start
+      performance.now() -
+      researchStartedAt
     ),
 
     x: rotationX,
     y: rotationY,
 
-    z: typeof rotationZ === "number"
-      ? rotationZ
-      : "",
+    z:
+      typeof rotationZ === "number"
+        ? rotationZ
+        : "",
 
-    finger: fingerHeld ? 1 : 0,
+    finger:
+      fingerHeld ? 1 : 0,
 
     state: scoopState,
 
-    event: eventName,
-    outcome: outcome,
+    event,
+    outcome,
 
-    speedX: "",
+    speedX: motionSpeedX,
 
-    minX: a.minX,
-    maxX: a.maxX
-  });
+    baselineX:
+      gesture
+        ? gesture.baseline
+        : "",
+
+    minX:
+      gesture
+        ? gesture.minX
+        : "",
+
+    totalScoops
+  };
 }
 
 // ==========================================
-// SAMPLE PHONE MOVEMENT
+// RECORD MOTION SAMPLES
 // ==========================================
 
 function recordResearchSample() {
-
   if (
     !researchOn ||
-    !researchAttempt ||
     !window.sensorsEnabled
   ) {
     return;
@@ -827,77 +1083,37 @@ function recordResearchSample() {
 
   const now = performance.now();
 
-  // Target approximately 20 Hz.
-  if (now - researchLastSample < 50) {
+  // Approximately 20 samples per second.
+
+  if (
+    now - researchLastSample < 50
+  ) {
     return;
   }
 
   researchLastSample = now;
 
-  const x = rotationX;
-
-  if (!Number.isFinite(x)) return;
-
-  const a = researchAttempt;
-
-  a.minX = Math.min(a.minX ?? x, x);
-  a.maxX = Math.max(a.maxX ?? x, x);
-
-  // Angular change per second.
-  const speedX =
-    researchLastT === null
-      ? ""
-      : (x - researchLastX) /
-        ((now - researchLastT) / 1000);
-
-  researchLastT = now;
-  researchLastX = x;
-
-  researchRows.push({
-
-    kind: "sample",
-
-    attempt: a.id,
-
-    ms: Math.round(now - a.start),
-
-    x: x,
-    y: rotationY,
-
-    z: typeof rotationZ === "number"
-      ? rotationZ
-      : "",
-
-    finger: fingerHeld ? 1 : 0,
-
-    state: scoopState,
-
-    event: "",
-    outcome: "",
-
-    speedX: speedX,
-
-    minX: a.minX,
-    maxX: a.maxX
-  });
+  researchRows.push(
+    researchRow("sample")
+  );
 }
 
 // ==========================================
-// EXPORT CSV
+// EXPORT RESEARCH CSV
 // ==========================================
 
 function exportResearchCSV() {
-
-  if (researchRows.length === 0) {
-
-    alert("No research data recorded yet.");
+  if (!researchRows.length) {
+    alert(
+      "No research data recorded yet."
+    );
     return;
   }
 
   const columns = [
-
     "kind",
-    "attempt",
+    "session",
+    "cycle",
     "ms",
     "x",
     "y",
@@ -907,71 +1123,60 @@ function exportResearchCSV() {
     "event",
     "outcome",
     "speedX",
+    "baselineX",
     "minX",
-    "maxX"
+    "totalScoops"
   ];
 
   const csv = [
-
     columns.join(","),
 
     ...researchRows.map(row =>
-
-      columns.map(key => {
-
-        const value = row[key] ?? "";
-
-        return '"' +
-          String(value).replace(/"/g, '""') +
-          '"';
-
-      }).join(",")
-
+      columns.map(key =>
+        '"' +
+        String(
+          row[key] ?? ""
+        ).replace(
+          /"/g,
+          '""'
+        ) +
+        '"'
+      ).join(",")
     )
-
   ].join("\r\n");
 
   const blob = new Blob(
     [csv],
-    { type: "text/csv;charset=utf-8" }
+    {
+      type:
+        "text/csv;charset=utf-8"
+    }
   );
 
-  const url = URL.createObjectURL(blob);
+  const url =
+    URL.createObjectURL(blob);
 
-  const link = document.createElement("a");
+  const link =
+    document.createElement("a");
 
   link.href = url;
 
   link.download =
-    "scoop-gesture-" +
+    "scoop-continuous-" +
     new Date()
       .toISOString()
       .replace(/[:.]/g, "-") +
     ".csv";
 
-  document.body.appendChild(link);
+  document.body.appendChild(
+    link
+  );
 
   link.click();
   link.remove();
 
-  setTimeout(() => {
-    URL.revokeObjectURL(url);
-  }, 1000);
-}
-
-// ==========================================
-// RESIZE
-// ==========================================
-
-function windowResized() {
-
-  resizeCanvas(windowWidth, windowHeight);
-
-  if (button) {
-
-    button.position(
-      width / 2 - 90,
-      height / 2 - 25
-    );
-  }
+  setTimeout(
+    () => URL.revokeObjectURL(url),
+    1000
+  );
 }
