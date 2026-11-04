@@ -1,24 +1,18 @@
 
 /*
-  SCOOP EVERYTHING
-  Player 1 - V2C
+  SCOOP EVERYTHING — PLAYER 1 V2C
+  Layered Kaleidoscopes
 
-  Multiple kaleidoscopes on a light background.
-
-  Preserves V2B continuous scoop recognition:
-  - Finger must remain held
-  - Dip and reversal required
-  - Multiple scoops without releasing
-  - Cooldown and rearming
-
-  Requires:
-  p5.js 2.2.3
-  p5.js compatibility 0.2.0
-  p5-phone 1.15.2
+  Each scoop:
+  - Adds a new kaleidoscope
+  - Keeps previous artwork
+  - Softly fades older layers
+  - Preserves continuous scoop detection
+  - Preserves CSV research recording
 */
 
 // ========================================
-// SCOOP CONFIGURATION - UNCHANGED
+// SCOOP DETECTION — ORIGINAL SETTINGS
 // ========================================
 
 const SCOOP = {
@@ -32,22 +26,39 @@ const SCOOP = {
 };
 
 // ========================================
-// COLOURS
+// ARTWORK SETTINGS
 // ========================================
 
+const ART = {
+  background: [233, 234, 240],
+  maxLayers: 24,
+
+  // Newest artwork is fully visible.
+  newestOpacity: 1,
+
+  // Older artwork stays visible but soft.
+  oldestOpacity: 0.12,
+
+  // Number of layers that fade gradually.
+  fadeLayers: 9,
+
+  // Duration of the new artwork appearing.
+  appearMs: 650,
+
+  // General size of each kaleidoscope.
+  minRadius: 0.12,
+  maxRadius: 0.23
+};
+
 const PALETTE = [
-  [217, 167, 160], // Soft peach
-  [169, 196, 196], // Pale teal
-  [199, 180, 219], // Lavender
-  [227, 197, 162], // Warm sand
-  [155, 170, 205], // Muted blue
-  [238, 230, 223], // Warm white
-  [177, 159, 193]  // Dusty purple
+  [217, 167, 160],
+  [169, 196, 196],
+  [199, 180, 219],
+  [227, 197, 162],
+  [155, 170, 205],
+  [238, 230, 223],
+  [177, 159, 193]
 ];
-
-const INK = [52, 59, 77];
-
-const MAX_KALEIDOSCOPES = 24;
 
 // ========================================
 // GLOBAL VARIABLES
@@ -67,13 +78,11 @@ let lastFilteredX = null;
 let lastMotionAt = 0;
 let motionSpeedX = 0;
 
-// Artwork
-
+// Each artwork is stored independently.
 let kaleidoscopes = [];
-let nextKaleidoscopeId = 1;
+let nextArtworkId = 1;
 
-// Research
-
+// Research variables.
 let researchOn = false;
 let researchRows = [];
 let researchPanel = null;
@@ -88,12 +97,7 @@ let researchStartedAt = 0;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
-
   pixelDensity(1);
-  frameRate(60);
-
-  // p5-phone manages window.sensorsEnabled.
-  // Do not redeclare that variable.
 
   sensorButton = createButton(
     "Enable Motion Sensors"
@@ -109,14 +113,16 @@ function setup() {
   sensorButton.size(200, 50);
 
   sensorButton.style(
-    "background",
-    "#343B4D"
+    "background", "#343B4D"
   );
-
   sensorButton.style("color", "#FFFFFF");
   sensorButton.style("border", "none");
-  sensorButton.style("border-radius", "28px");
-  sensorButton.style("font-size", "13px");
+  sensorButton.style(
+    "border-radius", "25px"
+  );
+  sensorButton.style(
+    "font-size", "13px"
+  );
 
   enableSensorOn("#enable-sensors");
   lockGestures();
@@ -131,11 +137,11 @@ function setup() {
 // ========================================
 
 function draw() {
-  drawLightBackground();
+  background(...ART.background);
 
   if (!window.sensorsEnabled) {
-    fill(...INK);
     noStroke();
+    fill(52, 59, 77);
     textSize(17);
     textAlign(CENTER, CENTER);
 
@@ -152,75 +158,34 @@ function draw() {
     sensorButton.hide();
   }
 
-  // Preserve V2B interaction order.
-
+  // Original working interaction.
   updateFinger();
   updateScoopGesture();
   recordResearchSample();
 
-  // Draw all accumulated kaleidoscopes.
-
-  for (const k of kaleidoscopes) {
-    updateKaleidoscope(k);
-    drawKaleidoscope(k);
-  }
+  // Draw accumulated layers.
+  drawAllKaleidoscopes();
 
   if (kaleidoscopes.length === 0) {
-    fill(95, 102, 120);
     noStroke();
-    textSize(17);
+    fill(100, 106, 123);
+    textSize(18);
     textAlign(CENTER, CENTER);
 
     text(
       "Hold + Scoop!",
       width / 2,
-      height * 0.65
+      height * 0.62
     );
   }
 
   drawDebugReadout();
-  drawBottomInstruction();
-}
-
-// ========================================
-// LIGHT BACKGROUND
-// ========================================
-
-function drawLightBackground() {
-  background(233, 234, 240);
-
-  noStroke();
-
-  // Gentle translucent atmospheric layers.
-
-  fill(255, 255, 255, 65);
-  ellipse(
-    width * 0.1,
-    height * 0.1,
-    width * 1.2,
-    height * 0.8
-  );
-
-  fill(217, 195, 220, 28);
-  ellipse(
-    width * 0.85,
-    height * 0.45,
-    width * 0.95,
-    height * 0.8
-  );
-
-  fill(177, 194, 218, 24);
-  ellipse(
-    width * 0.15,
-    height * 0.95,
-    width * 0.9,
-    height * 0.65
-  );
+  drawInstruction();
 }
 
 // ========================================
 // CONTINUOUS SCOOP DETECTION
-// V2B LOGIC PRESERVED
+// ORIGINAL V2B LOGIC
 // ========================================
 
 function updateScoopGesture() {
@@ -274,18 +239,15 @@ function updateScoopGesture() {
 
     scoopState = "ready";
     researchEvent("hold_started");
-
     return;
   }
 
   const g = gesture;
 
   // READY
-
   if (scoopState === "ready") {
     g.maxX = Math.max(
-      g.maxX,
-      filtered
+      g.maxX, filtered
     );
 
     g.baseline = g.maxX;
@@ -295,18 +257,16 @@ function updateScoopGesture() {
     ) {
       g.minX = filtered;
       g.start = now;
-
       scoopState = "dipped";
+
       researchEvent("dip_detected");
     }
   }
 
   // DIPPED
-
   else if (scoopState === "dipped") {
     g.minX = Math.min(
-      g.minX,
-      filtered
+      g.minX, filtered
     );
 
     if (
@@ -353,11 +313,9 @@ function updateScoopGesture() {
   }
 
   // REARM
-
   else if (scoopState === "rearm") {
     g.reversalPeak = Math.max(
-      g.reversalPeak,
-      filtered
+      g.reversalPeak, filtered
     );
 
     if (
@@ -386,79 +344,73 @@ function updateScoopGesture() {
 }
 
 // ========================================
-// SCOOP SUCCESS
+// EACH SCOOP ADDS ONE ARTWORK
 // ========================================
 
 function addScoop() {
   totalScoops++;
 
-  const k = createKaleidoscope();
+  // Create a new independent artwork.
+  const newArtwork = createKaleidoscope();
 
-  kaleidoscopes.push(k);
+  // Add without clearing previous artwork.
+  kaleidoscopes.push(newArtwork);
 
-  // Limit rendering load on phones.
-  // Oldest artwork is removed first.
-
+  // Keep a reasonable performance limit.
   if (
     kaleidoscopes.length >
-    MAX_KALEIDOSCOPES
+    ART.maxLayers
   ) {
     kaleidoscopes.shift();
   }
 }
 
 // ========================================
-// CREATE A NEW KALEIDOSCOPE
+// CREATE KALEIDOSCOPE
 // ========================================
 
 function createKaleidoscope() {
   const shortest = min(width, height);
 
-  // Different sizes for each scoop.
-
   const radius = random(
-    shortest * 0.10,
-    shortest * 0.25
+    shortest * ART.minRadius,
+    shortest * ART.maxRadius
   );
 
-  // Keep most of each circle on screen.
+  // Distribute artwork across the screen.
+  // Avoid the debug panel at the top.
+  const margin = radius * 0.6;
 
-  const margin = radius * 0.65;
-
-  const x = random(
-    margin,
-    max(margin, width - margin)
+  const left = margin;
+  const right = max(
+    left, width - margin
   );
 
-  const y = random(
-    margin + 65,
-    max(margin + 65, height - margin - 50)
+  const top = margin + 115;
+  const bottom = max(
+    top, height - margin - 65
   );
 
-  const sections = floor(random(5, 9));
+  const x = random(left, right);
+  const y = random(top, bottom);
 
   const colors = [];
 
   for (let i = 0; i < 4; i++) {
-    const choice = random(PALETTE);
-    colors.push([...choice]);
+    colors.push([
+      ...random(PALETTE)
+    ]);
   }
 
   const fragments = [];
 
-  const fragmentCount = floor(
-    random(5, 11)
-  );
+  const count = floor(random(6, 11));
 
-  for (
-    let i = 0;
-    i < fragmentCount;
-    i++
-  ) {
+  for (let i = 0; i < count; i++) {
     fragments.push({
-      distance: random(0.18, 0.95),
-      offset: random(-0.15, 0.15),
-      size: random(0.08, 0.27),
+      distance: random(0.22, 0.95),
+      offset: random(-0.13, 0.13),
+      size: random(0.09, 0.23),
       rotation: random(-0.7, 0.7),
       phase: random(TWO_PI),
       type: floor(random(4)),
@@ -467,7 +419,7 @@ function createKaleidoscope() {
   }
 
   return {
-    id: nextKaleidoscopeId++,
+    id: nextArtworkId++,
 
     x,
     y,
@@ -475,111 +427,154 @@ function createKaleidoscope() {
     homeY: y,
 
     radius,
-    sections,
+    sections: floor(random(5, 9)),
     colors,
     fragments,
 
     rotation: random(TWO_PI),
 
     rotationSpeed:
-      random(0.0015, 0.006) *
+      random(0.001, 0.004) *
       random([-1, 1]),
 
     phase: random(TWO_PI),
 
-    driftX: random(4, 18),
-    driftY: random(4, 18),
+    driftX: random(3, 10),
+    driftY: random(3, 10),
 
     driftSpeedX: random(
-      0.002,
-      0.006
+      0.0015, 0.004
     ),
 
     driftSpeedY: random(
-      0.002,
-      0.006
+      0.0015, 0.004
     ),
 
     breathSpeed: random(
-      0.008,
-      0.02
+      0.006, 0.014
     ),
 
-    opacity: 0,
     createdAt: millis()
   };
 }
 
 // ========================================
-// ANIMATE KALEIDOSCOPE
+// DRAW ALL LAYERS
 // ========================================
 
-function updateKaleidoscope(k) {
-  const t = frameCount;
+function drawAllKaleidoscopes() {
+  const count = kaleidoscopes.length;
 
-  k.rotation += k.rotationSpeed;
+  for (let i = 0; i < count; i++) {
+    const k = kaleidoscopes[i];
 
-  k.x =
-    k.homeX +
-    sin(
-      t * k.driftSpeedX +
-      k.phase
-    ) * k.driftX;
+    // Age 0 means newest artwork.
+    const age = count - 1 - i;
 
-  k.y =
-    k.homeY +
-    cos(
-      t * k.driftSpeedY +
-      k.phase
-    ) * k.driftY;
+    // Older artworks become increasingly
+    // transparent, but never fully vanish.
+    const fadeProgress = constrain(
+      age / ART.fadeLayers,
+      0,
+      1
+    );
 
-  k.opacity = min(
-    1,
-    k.opacity + 0.035
-  );
+    const targetOpacity = lerp(
+      ART.newestOpacity,
+      ART.oldestOpacity,
+      fadeProgress
+    );
+
+    // Fade in each newly created artwork.
+    const appear = constrain(
+      (millis() - k.createdAt) /
+      ART.appearMs,
+      0,
+      1
+    );
+
+    const opacity =
+      targetOpacity * appear;
+
+    // Older artwork rotates more slowly.
+    const speedMultiplier = lerp(
+      1,
+      0.2,
+      fadeProgress
+    );
+
+    k.rotation +=
+      k.rotationSpeed *
+      speedMultiplier;
+
+    const t = frameCount;
+
+    const x =
+      k.homeX +
+      sin(
+        t * k.driftSpeedX +
+        k.phase
+      ) * k.driftX;
+
+    const y =
+      k.homeY +
+      cos(
+        t * k.driftSpeedY +
+        k.phase
+      ) * k.driftY;
+
+    drawKaleidoscope(
+      k,
+      x,
+      y,
+      opacity
+    );
+  }
 }
 
 // ========================================
-// DRAW KALEIDOSCOPE
+// DRAW ONE KALEIDOSCOPE
 // ========================================
 
-function drawKaleidoscope(k) {
+function drawKaleidoscope(
+  k,
+  x,
+  y,
+  opacity
+) {
   push();
 
-  translate(k.x, k.y);
+  translate(x, y);
 
   const breathing =
     1 +
     sin(
       frameCount * k.breathSpeed +
       k.phase
-    ) * 0.045;
+    ) * 0.035;
 
   scale(breathing);
-
   rotate(k.rotation);
 
-  // Soft atmospheric circle.
+  // Very soft circular glow.
+  const glow = k.colors[0];
 
   noStroke();
-
-  const glow = k.colors[0];
 
   fill(
     glow[0],
     glow[1],
     glow[2],
-    13 * k.opacity
+    12 * opacity
   );
 
   circle(
     0,
     0,
-    k.radius * 2.4
+    k.radius * 2.25
   );
 
-  // Repeated mirrored sections.
-
+  // Mirrored radial sections.
   for (
     let section = 0;
     section < k.sections;
@@ -593,23 +588,27 @@ function drawKaleidoscope(k) {
       k.sections
     );
 
-    drawFragmentGroup(k);
+    drawFragmentGroup(
+      k, opacity
+    );
 
     scale(1, -1);
-    drawFragmentGroup(k);
+
+    drawFragmentGroup(
+      k, opacity
+    );
 
     pop();
   }
 
-  // Delicate centre.
-
+  // Subtle centre.
   noFill();
 
   stroke(
     k.colors[1][0],
     k.colors[1][1],
     k.colors[1][2],
-    65 * k.opacity
+    70 * opacity
   );
 
   strokeWeight(0.8);
@@ -617,7 +616,7 @@ function drawKaleidoscope(k) {
   circle(
     0,
     0,
-    k.radius * 0.26
+    k.radius * 0.25
   );
 
   noStroke();
@@ -626,13 +625,13 @@ function drawKaleidoscope(k) {
     255,
     255,
     255,
-    175 * k.opacity
+    180 * opacity
   );
 
   circle(
     0,
     0,
-    k.radius * 0.055
+    k.radius * 0.06
   );
 
   pop();
@@ -642,17 +641,18 @@ function drawKaleidoscope(k) {
 // DRAW FRAGMENT GROUP
 // ========================================
 
-function drawFragmentGroup(k) {
-  for (
-    const f of k.fragments
-  ) {
+function drawFragmentGroup(
+  k,
+  opacity
+) {
+  for (const f of k.fragments) {
     push();
 
     const drift =
       sin(
-        frameCount * 0.007 +
+        frameCount * 0.005 +
         f.phase
-      ) * k.radius * 0.025;
+      ) * k.radius * 0.02;
 
     translate(
       k.radius * f.distance + drift,
@@ -662,9 +662,9 @@ function drawFragmentGroup(k) {
     rotate(
       f.rotation +
       sin(
-        frameCount * 0.003 +
+        frameCount * 0.002 +
         f.phase
-      ) * 0.08
+      ) * 0.06
     );
 
     const size =
@@ -677,7 +677,7 @@ function drawFragmentGroup(k) {
       f.type,
       size,
       c,
-      k.opacity
+      opacity
     );
 
     pop();
@@ -685,7 +685,7 @@ function drawFragmentGroup(k) {
 }
 
 // ========================================
-// DRAW INDIVIDUAL FRAGMENTS
+// GLASS FRAGMENT SHAPES
 // ========================================
 
 function drawGlassFragment(
@@ -694,21 +694,18 @@ function drawGlassFragment(
   c,
   opacity
 ) {
-  const alpha =
-    110 * opacity;
-
   fill(
     c[0],
     c[1],
     c[2],
-    alpha
+    125 * opacity
   );
 
   stroke(
-    min(255, c[0] + 30),
-    min(255, c[1] + 30),
-    min(255, c[2] + 30),
-    150 * opacity
+    min(255, c[0] + 25),
+    min(255, c[1] + 25),
+    min(255, c[2] + 25),
+    145 * opacity
   );
 
   strokeWeight(0.7);
@@ -717,10 +714,10 @@ function drawGlassFragment(
     beginShape();
 
     vertex(-s * 0.5, -s * 0.1);
-    vertex(-s * 0.2, -s * 0.48);
-    vertex(s * 0.45, -s * 0.2);
-    vertex(s * 0.35, s * 0.35);
-    vertex(-s * 0.25, s * 0.3);
+    vertex(-s * 0.15, -s * 0.45);
+    vertex(s * 0.48, -s * 0.18);
+    vertex(s * 0.3, s * 0.38);
+    vertex(-s * 0.3, s * 0.28);
 
     endShape(CLOSE);
   }
@@ -739,28 +736,26 @@ function drawGlassFragment(
 
   else if (type === 2) {
     triangle(
-      -s * 0.5,
+      -s * 0.45,
       s * 0.3,
 
       0,
-      -s * 0.5,
+      -s * 0.48,
 
-      s * 0.5,
+      s * 0.45,
       s * 0.3
     );
   }
 
   else {
-    ellipse(
+    circle(
       0,
       0,
-      s * 0.75,
-      s * 0.75
+      s * 0.7
     );
   }
 
-  // Small translucent highlight.
-
+  // Gentle glass reflection.
   noStroke();
 
   fill(
@@ -773,12 +768,12 @@ function drawGlassFragment(
   circle(
     -s * 0.12,
     -s * 0.12,
-    s * 0.15
+    s * 0.14
   );
 }
 
 // ========================================
-// FINGER TRACKING - V2B PRESERVED
+// FINGER TRACKING — ORIGINAL V2B
 // ========================================
 
 function updateFinger() {
@@ -858,12 +853,12 @@ function mouseReleased() {
 }
 
 // ========================================
-// DEBUG INFORMATION
+// DEBUG READOUT
 // ========================================
 
 function drawDebugReadout() {
-  fill(85, 92, 110);
   noStroke();
+  fill(85, 92, 110);
 
   textSize(12);
   textAlign(LEFT, TOP);
@@ -880,14 +875,12 @@ function drawDebugReadout() {
 
   text(
     "rotationX " + xText,
-    12,
-    12
+    12, 12
   );
 
   text(
     "rotationY " + yText,
-    12,
-    30
+    12, 30
   );
 
   text(
@@ -899,28 +892,24 @@ function drawDebugReadout() {
         ? "-"
         : trackedFingerId
     ),
-    12,
-    48
+    12, 48
   );
 
   text(
     "state " + scoopState,
-    12,
-    66
+    12, 66
   );
 
   text(
     "successful scoops " +
     totalScoops,
-    12,
-    84
+    12, 84
   );
 
   text(
-    "visible kaleidoscopes " +
+    "visible layers " +
     kaleidoscopes.length,
-    12,
-    102
+    12, 102
   );
 
   textAlign(CENTER, CENTER);
@@ -930,23 +919,17 @@ function drawDebugReadout() {
 // BOTTOM INSTRUCTION
 // ========================================
 
-function drawBottomInstruction() {
-  fill(105, 110, 125, 200);
+function drawInstruction() {
   noStroke();
+  fill(105, 110, 125);
 
   textSize(12);
   textAlign(CENTER, CENTER);
 
   text(
-    "Hold your finger and scoop to create",
+    "Hold + Scoop to add a new layer",
     width / 2,
-    height - 48
-  );
-
-  text(
-    "a new kaleidoscope",
-    width / 2,
-    height - 30
+    height - 38
   );
 }
 
@@ -963,13 +946,9 @@ function windowResized() {
     windowHeight
   );
 
-  // Keep existing artwork in
-  // approximately the same positions.
-
   for (const k of kaleidoscopes) {
     k.homeX *= width / oldWidth;
     k.homeY *= height / oldHeight;
-
     k.x *= width / oldWidth;
     k.y *= height / oldHeight;
   }
@@ -1052,7 +1031,6 @@ function setupResearchPanel() {
         );
 
         researchOn = false;
-
         b.textContent =
           "Start recording";
       } else {
@@ -1068,7 +1046,6 @@ function setupResearchPanel() {
           performance.now();
 
         researchLastSample = 0;
-
         b.textContent =
           "Stop recording";
 
@@ -1105,7 +1082,7 @@ function setupResearchPanel() {
 }
 
 // ========================================
-// RESEARCH EVENT
+// RESEARCH EVENTS
 // ========================================
 
 function researchEvent(
@@ -1125,10 +1102,6 @@ function researchEvent(
   );
 }
 
-// ========================================
-// RESEARCH ROW
-// ========================================
-
 function researchRow(
   kind,
   event = "",
@@ -1136,7 +1109,6 @@ function researchRow(
 ) {
   return {
     kind,
-
     session: researchSession,
     cycle: researchCycle,
 
@@ -1177,7 +1149,7 @@ function researchRow(
 }
 
 // ========================================
-// RECORD MOTION SAMPLES
+// RESEARCH SAMPLING
 // ========================================
 
 function recordResearchSample() {
