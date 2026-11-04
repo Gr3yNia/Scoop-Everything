@@ -1,46 +1,53 @@
 
 /*
- * SCOOP EVERYTHING
- * Continuous Scoop Research — V2B
- *
- * One finger may stay on the screen for
- * multiple consecutive scoops.
- *
- * Requires:
- * - p5.js
- * - p5-phone 1.15.2
- *
- * CSV research data is kept in memory
- * until exported or the page is closed.
- */
+  SCOOP EVERYTHING
+  Player 1 - V2C
+
+  Multiple kaleidoscopes on a light background.
+
+  Preserves V2B continuous scoop recognition:
+  - Finger must remain held
+  - Dip and reversal required
+  - Multiple scoops without releasing
+  - Cooldown and rearming
+
+  Requires:
+  p5.js 2.2.3
+  p5.js compatibility 0.2.0
+  p5-phone 1.15.2
+*/
 
 // ========================================
-// CONFIGURATION
+// SCOOP CONFIGURATION - UNCHANGED
 // ========================================
 
 const SCOOP = {
-  // Relative angular movement in radians.
   dip: 0.30,
-
-  // Required return movement after a dip.
   reversal: 0.15,
-
-  // Required new downward movement to
-  // rearm after a successful scoop.
   rearm: 0.12,
-
-  // Minimum time between dip and reversal.
   minMs: 140,
-
-  // Maximum time allowed for a scoop.
   maxMs: 4500,
-
-  // Prevent multiple counts from one scoop.
   cooldownMs: 320,
-
-  // Motion smoothing: 0 to 1.
   smoothing: 0.25
 };
+
+// ========================================
+// COLOURS
+// ========================================
+
+const PALETTE = [
+  [217, 167, 160], // Soft peach
+  [169, 196, 196], // Pale teal
+  [199, 180, 219], // Lavender
+  [227, 197, 162], // Warm sand
+  [155, 170, 205], // Muted blue
+  [238, 230, 223], // Warm white
+  [177, 159, 193]  // Dusty purple
+];
+
+const INK = [52, 59, 77];
+
+const MAX_KALEIDOSCOPES = 24;
 
 // ========================================
 // GLOBAL VARIABLES
@@ -60,7 +67,13 @@ let lastFilteredX = null;
 let lastMotionAt = 0;
 let motionSpeedX = 0;
 
-// Research variables.
+// Artwork
+
+let kaleidoscopes = [];
+let nextKaleidoscopeId = 1;
+
+// Research
+
 let researchOn = false;
 let researchRows = [];
 let researchPanel = null;
@@ -69,12 +82,6 @@ let researchCycle = 0;
 let researchLastSample = 0;
 let researchStartedAt = 0;
 
-// Artwork variables.
-let artworkActive = false;
-let fragments = [];
-let rotationNow = 0;
-let spreadNow = 1;
-
 // ========================================
 // SETUP
 // ========================================
@@ -82,8 +89,11 @@ let spreadNow = 1;
 function setup() {
   createCanvas(windowWidth, windowHeight);
 
-  // p5-phone uses window.sensorsEnabled.
-  // Do not redeclare sensorsEnabled.
+  pixelDensity(1);
+  frameRate(60);
+
+  // p5-phone manages window.sensorsEnabled.
+  // Do not redeclare that variable.
 
   sensorButton = createButton(
     "Enable Motion Sensors"
@@ -92,16 +102,25 @@ function setup() {
   sensorButton.id("enable-sensors");
 
   sensorButton.position(
-    width / 2 - 90,
+    width / 2 - 100,
     height / 2 - 25
   );
 
-  sensorButton.size(180, 50);
+  sensorButton.size(200, 50);
+
+  sensorButton.style(
+    "background",
+    "#343B4D"
+  );
+
+  sensorButton.style("color", "#FFFFFF");
+  sensorButton.style("border", "none");
+  sensorButton.style("border-radius", "28px");
+  sensorButton.style("font-size", "13px");
 
   enableSensorOn("#enable-sensors");
   lockGestures();
 
-  createFragments();
   setupResearchPanel();
 
   textAlign(CENTER, CENTER);
@@ -112,18 +131,18 @@ function setup() {
 // ========================================
 
 function draw() {
-  background(14, 14, 15);
+  drawLightBackground();
 
   if (!window.sensorsEnabled) {
-    fill(240);
+    fill(...INK);
     noStroke();
-    textSize(18);
+    textSize(17);
     textAlign(CENTER, CENTER);
 
     text(
       "Tap the button to start",
       width / 2,
-      height / 2 - 70
+      height / 2 - 75
     );
 
     return;
@@ -133,30 +152,75 @@ function draw() {
     sensorButton.hide();
   }
 
+  // Preserve V2B interaction order.
+
   updateFinger();
   updateScoopGesture();
   recordResearchSample();
 
-  if (artworkActive) {
-    drawArtwork();
-  } else {
-    fill(225);
+  // Draw all accumulated kaleidoscopes.
+
+  for (const k of kaleidoscopes) {
+    updateKaleidoscope(k);
+    drawKaleidoscope(k);
+  }
+
+  if (kaleidoscopes.length === 0) {
+    fill(95, 102, 120);
     noStroke();
-    textSize(18);
+    textSize(17);
     textAlign(CENTER, CENTER);
 
     text(
       "Hold + Scoop!",
       width / 2,
-      height - 50
+      height * 0.65
     );
   }
 
   drawDebugReadout();
+  drawBottomInstruction();
+}
+
+// ========================================
+// LIGHT BACKGROUND
+// ========================================
+
+function drawLightBackground() {
+  background(233, 234, 240);
+
+  noStroke();
+
+  // Gentle translucent atmospheric layers.
+
+  fill(255, 255, 255, 65);
+  ellipse(
+    width * 0.1,
+    height * 0.1,
+    width * 1.2,
+    height * 0.8
+  );
+
+  fill(217, 195, 220, 28);
+  ellipse(
+    width * 0.85,
+    height * 0.45,
+    width * 0.95,
+    height * 0.8
+  );
+
+  fill(177, 194, 218, 24);
+  ellipse(
+    width * 0.15,
+    height * 0.95,
+    width * 0.9,
+    height * 0.65
+  );
 }
 
 // ========================================
 // CONTINUOUS SCOOP DETECTION
+// V2B LOGIC PRESERVED
 // ========================================
 
 function updateScoopGesture() {
@@ -167,9 +231,6 @@ function updateScoopGesture() {
     return;
   }
 
-  // Finger release ends the current hold.
-  // It is NOT required between scoops.
-
   if (!fingerHeld) {
     gesture = null;
     scoopState = "waiting";
@@ -178,8 +239,6 @@ function updateScoopGesture() {
     motionSpeedX = 0;
     return;
   }
-
-  // Smooth the X-axis rotation.
 
   const dt = lastMotionAt
     ? (now - lastMotionAt) / 1000
@@ -192,10 +251,6 @@ function updateScoopGesture() {
     : previous +
       SCOOP.smoothing * (x - previous);
 
-  // Approximate angular velocity.
-  // This is derived from rotationX,
-  // not a raw gyroscope measurement.
-
   motionSpeedX =
     dt > 0.005 &&
     dt < 0.25 &&
@@ -205,9 +260,6 @@ function updateScoopGesture() {
 
   lastFilteredX = filtered;
   lastMotionAt = now;
-
-  // Create a gesture only once per
-  // continuous finger hold.
 
   if (!gesture) {
     gesture = {
@@ -221,7 +273,6 @@ function updateScoopGesture() {
     };
 
     scoopState = "ready";
-
     researchEvent("hold_started");
 
     return;
@@ -229,10 +280,7 @@ function updateScoopGesture() {
 
   const g = gesture;
 
-  // ------------------------------------
   // READY
-  // Track a local high point, then dip.
-  // ------------------------------------
 
   if (scoopState === "ready") {
     g.maxX = Math.max(
@@ -249,24 +297,17 @@ function updateScoopGesture() {
       g.start = now;
 
       scoopState = "dipped";
-
       researchEvent("dip_detected");
     }
   }
 
-  // ------------------------------------
   // DIPPED
-  // Track the low point and reversal.
-  // ------------------------------------
 
   else if (scoopState === "dipped") {
     g.minX = Math.min(
       g.minX,
       filtered
     );
-
-    // If a movement is abandoned,
-    // restart from the current position.
 
     if (
       now - g.start > SCOOP.maxMs
@@ -282,9 +323,6 @@ function updateScoopGesture() {
 
       scoopState = "ready";
     }
-
-    // A scoop succeeds when the phone
-    // reverses sufficiently after dipping.
 
     else if (
       filtered - g.minX >=
@@ -309,33 +347,18 @@ function updateScoopGesture() {
         "recognized"
       );
 
-      // Do not require returning to
-      // the original starting angle.
-
       g.reversalPeak = filtered;
-
       scoopState = "rearm";
     }
   }
 
-  // ------------------------------------
   // REARM
-  // Wait for a fresh downward movement.
-  // ------------------------------------
 
   else if (scoopState === "rearm") {
-    // Track the local high point
-    // after the previous scoop.
-
     g.reversalPeak = Math.max(
       g.reversalPeak,
       filtered
     );
-
-    // A new downward movement indicates
-    // that the player has begun another
-    // scoop, even if the finger remains
-    // on the screen.
 
     if (
       now - g.lastSuccess >=
@@ -350,20 +373,13 @@ function updateScoopGesture() {
       g.start = now;
 
       if (
-        g.maxX - filtered >=
-          SCOOP.dip
+        g.maxX - filtered >= SCOOP.dip
       ) {
         scoopState = "dipped";
-
-        researchEvent(
-          "dip_detected"
-        );
+        researchEvent("dip_detected");
       } else {
         scoopState = "ready";
-
-        researchEvent(
-          "rearmed"
-        );
+        researchEvent("rearmed");
       }
     }
   }
@@ -376,173 +392,292 @@ function updateScoopGesture() {
 function addScoop() {
   totalScoops++;
 
-  artworkActive = true;
+  const k = createKaleidoscope();
 
-  // Create a new visual composition.
-  createFragments();
+  kaleidoscopes.push(k);
 
-  rotationNow = 0;
-  spreadNow = 1;
+  // Limit rendering load on phones.
+  // Oldest artwork is removed first.
+
+  if (
+    kaleidoscopes.length >
+    MAX_KALEIDOSCOPES
+  ) {
+    kaleidoscopes.shift();
+  }
 }
 
 // ========================================
-// GENERATE KALEIDOSCOPE FRAGMENTS
+// CREATE A NEW KALEIDOSCOPE
 // ========================================
 
-function createFragments() {
-  fragments = [];
+function createKaleidoscope() {
+  const shortest = min(width, height);
 
-  for (let i = 0; i < 12; i++) {
+  // Different sizes for each scoop.
+
+  const radius = random(
+    shortest * 0.10,
+    shortest * 0.25
+  );
+
+  // Keep most of each circle on screen.
+
+  const margin = radius * 0.65;
+
+  const x = random(
+    margin,
+    max(margin, width - margin)
+  );
+
+  const y = random(
+    margin + 65,
+    max(margin + 65, height - margin - 50)
+  );
+
+  const sections = floor(random(5, 9));
+
+  const colors = [];
+
+  for (let i = 0; i < 4; i++) {
+    const choice = random(PALETTE);
+    colors.push([...choice]);
+  }
+
+  const fragments = [];
+
+  const fragmentCount = floor(
+    random(5, 11)
+  );
+
+  for (
+    let i = 0;
+    i < fragmentCount;
+    i++
+  ) {
     fragments.push({
-      distance: random(0.25, 1),
-      size: random(25, 85),
-      offset: random(-28, 28),
-
-      rotation: radians(
-        random(-25, 25)
-      ),
-
-      phase: radians(
-        random(360)
-      ),
-
-      type: floor(random(4))
+      distance: random(0.18, 0.95),
+      offset: random(-0.15, 0.15),
+      size: random(0.08, 0.27),
+      rotation: random(-0.7, 0.7),
+      phase: random(TWO_PI),
+      type: floor(random(4)),
+      colorIndex: floor(random(4))
     });
   }
+
+  return {
+    id: nextKaleidoscopeId++,
+
+    x,
+    y,
+    homeX: x,
+    homeY: y,
+
+    radius,
+    sections,
+    colors,
+    fragments,
+
+    rotation: random(TWO_PI),
+
+    rotationSpeed:
+      random(0.0015, 0.006) *
+      random([-1, 1]),
+
+    phase: random(TWO_PI),
+
+    driftX: random(4, 18),
+    driftY: random(4, 18),
+
+    driftSpeedX: random(
+      0.002,
+      0.006
+    ),
+
+    driftSpeedY: random(
+      0.002,
+      0.006
+    ),
+
+    breathSpeed: random(
+      0.008,
+      0.02
+    ),
+
+    opacity: 0,
+    createdAt: millis()
+  };
+}
+
+// ========================================
+// ANIMATE KALEIDOSCOPE
+// ========================================
+
+function updateKaleidoscope(k) {
+  const t = frameCount;
+
+  k.rotation += k.rotationSpeed;
+
+  k.x =
+    k.homeX +
+    sin(
+      t * k.driftSpeedX +
+      k.phase
+    ) * k.driftX;
+
+  k.y =
+    k.homeY +
+    cos(
+      t * k.driftSpeedY +
+      k.phase
+    ) * k.driftY;
+
+  k.opacity = min(
+    1,
+    k.opacity + 0.035
+  );
 }
 
 // ========================================
 // DRAW KALEIDOSCOPE
 // ========================================
 
-function drawArtwork() {
-  let targetRotation = rotationNow;
-  let targetSpread = spreadNow;
-
-  // When the finger is lifted,
-  // phone tilting manipulates the artwork.
-  //
-  // When the finger is held,
-  // motion is used for scoop recognition.
-
-  if (!fingerHeld) {
-    targetRotation = constrain(
-      rotationY * 0.45,
-      -0.45,
-      0.45
-    );
-
-    targetSpread = map(
-      rotationX,
-      -0.6,
-      0.6,
-      1.45,
-      0.55,
-      true
-    );
-  }
-
-  rotationNow = lerp(
-    rotationNow,
-    targetRotation,
-    0.08
-  );
-
-  spreadNow = lerp(
-    spreadNow,
-    targetSpread,
-    0.08
-  );
-
+function drawKaleidoscope(k) {
   push();
 
-  translate(
-    width / 2,
-    height / 2
+  translate(k.x, k.y);
+
+  const breathing =
+    1 +
+    sin(
+      frameCount * k.breathSpeed +
+      k.phase
+    ) * 0.045;
+
+  scale(breathing);
+
+  rotate(k.rotation);
+
+  // Soft atmospheric circle.
+
+  noStroke();
+
+  const glow = k.colors[0];
+
+  fill(
+    glow[0],
+    glow[1],
+    glow[2],
+    13 * k.opacity
   );
 
-  drawAtmosphere();
+  circle(
+    0,
+    0,
+    k.radius * 2.4
+  );
 
-  const sections = 6;
+  // Repeated mirrored sections.
 
   for (
-    let i = 0;
-    i < sections;
-    i++
+    let section = 0;
+    section < k.sections;
+    section++
   ) {
     push();
 
     rotate(
-      i * (TWO_PI / sections) +
-      rotationNow
+      section *
+      TWO_PI /
+      k.sections
     );
 
-    drawFragmentGroup(i);
+    drawFragmentGroup(k);
 
     scale(1, -1);
-    drawFragmentGroup(i);
+    drawFragmentGroup(k);
 
     pop();
   }
 
-  drawVoid();
+  // Delicate centre.
 
-  pop();
+  noFill();
 
-  fill(240, 220);
+  stroke(
+    k.colors[1][0],
+    k.colors[1][1],
+    k.colors[1][2],
+    65 * k.opacity
+  );
+
+  strokeWeight(0.8);
+
+  circle(
+    0,
+    0,
+    k.radius * 0.26
+  );
+
   noStroke();
 
-  textSize(14);
-  textAlign(CENTER, CENTER);
-
-  text(
-    "Move your phone to reveal the magic of the kaleidoscope.",
-    width / 2,
-    height - 45
+  fill(
+    255,
+    255,
+    255,
+    175 * k.opacity
   );
+
+  circle(
+    0,
+    0,
+    k.radius * 0.055
+  );
+
+  pop();
 }
 
 // ========================================
 // DRAW FRAGMENT GROUP
 // ========================================
 
-function drawFragmentGroup(section) {
-  const maxRadius =
-    min(width, height) * 0.38;
-
+function drawFragmentGroup(k) {
   for (
-    let i = 0;
-    i < fragments.length;
-    i++
+    const f of k.fragments
   ) {
-    const f = fragments[i];
-
     push();
-
-    const radius =
-      maxRadius *
-      f.distance *
-      spreadNow;
 
     const drift =
       sin(
-        frameCount * 0.003 +
+        frameCount * 0.007 +
         f.phase
-      ) * 4;
+      ) * k.radius * 0.025;
 
     translate(
-      radius + drift,
-      f.offset
+      k.radius * f.distance + drift,
+      k.radius * f.offset
     );
 
     rotate(
       f.rotation +
-      rotationNow * 0.25
+      sin(
+        frameCount * 0.003 +
+        f.phase
+      ) * 0.08
     );
 
-    drawFragment(
+    const size =
+      k.radius * f.size;
+
+    const c =
+      k.colors[f.colorIndex];
+
+    drawGlassFragment(
       f.type,
-      f.size
+      size,
+      c,
+      k.opacity
     );
 
     pop();
@@ -553,226 +688,97 @@ function drawFragmentGroup(section) {
 // DRAW INDIVIDUAL FRAGMENTS
 // ========================================
 
-function drawFragment(type, s) {
-  strokeWeight(0.8);
+function drawGlassFragment(
+  type,
+  s,
+  c,
+  opacity
+) {
+  const alpha =
+    110 * opacity;
+
+  fill(
+    c[0],
+    c[1],
+    c[2],
+    alpha
+  );
+
+  stroke(
+    min(255, c[0] + 30),
+    min(255, c[1] + 30),
+    min(255, c[2] + 30),
+    150 * opacity
+  );
+
+  strokeWeight(0.7);
 
   if (type === 0) {
-    // Burnt orange glass.
-
-    fill(
-      186, 91, 45, 115
-    );
-
-    stroke(
-      226, 146, 100, 150
-    );
-
     beginShape();
 
-    vertex(
-      -s * 0.50,
-      -s * 0.10
-    );
-
-    vertex(
-      -s * 0.15,
-      -s * 0.45
-    );
-
-    vertex(
-      s * 0.48,
-      -s * 0.18
-    );
-
-    vertex(
-      s * 0.30,
-      s * 0.38
-    );
-
-    vertex(
-      -s * 0.30,
-      s * 0.28
-    );
+    vertex(-s * 0.5, -s * 0.1);
+    vertex(-s * 0.2, -s * 0.48);
+    vertex(s * 0.45, -s * 0.2);
+    vertex(s * 0.35, s * 0.35);
+    vertex(-s * 0.25, s * 0.3);
 
     endShape(CLOSE);
   }
 
   else if (type === 1) {
-    // Translucent white glass.
+    rectMode(CENTER);
 
-    fill(
-      218, 214, 202, 55
+    rect(
+      0,
+      0,
+      s * 0.9,
+      s * 0.5,
+      s * 0.08
     );
-
-    stroke(
-      240, 236, 222, 110
-    );
-
-    beginShape();
-
-    vertex(
-      -s * 0.48,
-      0
-    );
-
-    vertex(
-      -s * 0.12,
-      -s * 0.32
-    );
-
-    vertex(
-      s * 0.46,
-      -s * 0.16
-    );
-
-    vertex(
-      s * 0.28,
-      s * 0.28
-    );
-
-    vertex(
-      -s * 0.28,
-      s * 0.38
-    );
-
-    endShape(CLOSE);
   }
 
   else if (type === 2) {
-    // Smoke-coloured glass.
-
-    fill(
-      78, 75, 72, 125
-    );
-
-    stroke(
-      155, 150, 140, 80
-    );
-
     triangle(
-      -s * 0.45,
-      s * 0.30,
+      -s * 0.5,
+      s * 0.3,
 
       0,
-      -s * 0.48,
+      -s * 0.5,
 
-      s * 0.45,
-      s * 0.30
+      s * 0.5,
+      s * 0.3
     );
   }
 
   else {
-    // Circular fragment.
-
-    fill(
-      205, 181, 145, 75
-    );
-
-    stroke(
-      230, 214, 190, 100
-    );
-
-    circle(
+    ellipse(
       0,
       0,
-      s * 0.55
+      s * 0.75,
+      s * 0.75
     );
   }
-}
 
-// ========================================
-// DRAW BACKGROUND ATMOSPHERE
-// ========================================
-
-function drawAtmosphere() {
-  noStroke();
-
-  for (
-    let d = 400;
-    d > 20;
-    d -= 25
-  ) {
-    const a = map(
-      d,
-      400,
-      20,
-      0,
-      10
-    );
-
-    fill(
-      220,
-      205,
-      180,
-      a
-    );
-
-    circle(
-      0,
-      0,
-      d
-    );
-  }
-}
-
-// ========================================
-// DRAW CENTRAL VOID
-// ========================================
-
-function drawVoid() {
-  push();
-
-  noFill();
-
-  stroke(
-    220, 211, 195, 70
-  );
-
-  strokeWeight(1);
-
-  circle(
-    0,
-    0,
-    105
-  );
-
-  stroke(
-    186, 91, 45, 150
-  );
-
-  circle(
-    0,
-    0,
-    70
-  );
+  // Small translucent highlight.
 
   noStroke();
 
   fill(
-    10, 10, 11
+    255,
+    255,
+    255,
+    55 * opacity
   );
 
   circle(
-    0,
-    0,
-    48
+    -s * 0.12,
+    -s * 0.12,
+    s * 0.15
   );
-
-  fill(
-    225, 214, 195
-  );
-
-  circle(
-    0,
-    0,
-    5
-  );
-
-  pop();
 }
 
 // ========================================
-// FINGER TRACKING
+// FINGER TRACKING - V2B PRESERVED
 // ========================================
 
 function updateFinger() {
@@ -790,7 +796,6 @@ function updateFinger() {
         touches[0].id;
 
       fingerHeld = true;
-
       researchSession++;
 
       researchEvent(
@@ -853,11 +858,11 @@ function mouseReleased() {
 }
 
 // ========================================
-// LIVE DEBUG INFORMATION
+// DEBUG INFORMATION
 // ========================================
 
 function drawDebugReadout() {
-  fill(240);
+  fill(85, 92, 110);
   noStroke();
 
   textSize(12);
@@ -887,11 +892,7 @@ function drawDebugReadout() {
 
   text(
     "finger " +
-    (
-      fingerHeld
-        ? "down"
-        : "up"
-    ) +
+    (fingerHeld ? "down" : "up") +
     "  id " +
     (
       trackedFingerId === null
@@ -915,7 +916,38 @@ function drawDebugReadout() {
     84
   );
 
+  text(
+    "visible kaleidoscopes " +
+    kaleidoscopes.length,
+    12,
+    102
+  );
+
   textAlign(CENTER, CENTER);
+}
+
+// ========================================
+// BOTTOM INSTRUCTION
+// ========================================
+
+function drawBottomInstruction() {
+  fill(105, 110, 125, 200);
+  noStroke();
+
+  textSize(12);
+  textAlign(CENTER, CENTER);
+
+  text(
+    "Hold your finger and scoop to create",
+    width / 2,
+    height - 48
+  );
+
+  text(
+    "a new kaleidoscope",
+    width / 2,
+    height - 30
+  );
 }
 
 // ========================================
@@ -923,14 +955,28 @@ function drawDebugReadout() {
 // ========================================
 
 function windowResized() {
+  const oldWidth = width;
+  const oldHeight = height;
+
   resizeCanvas(
     windowWidth,
     windowHeight
   );
 
+  // Keep existing artwork in
+  // approximately the same positions.
+
+  for (const k of kaleidoscopes) {
+    k.homeX *= width / oldWidth;
+    k.homeY *= height / oldHeight;
+
+    k.x *= width / oldWidth;
+    k.y *= height / oldHeight;
+  }
+
   if (sensorButton) {
     sensorButton.position(
-      width / 2 - 90,
+      width / 2 - 100,
       height / 2 - 25
     );
   }
@@ -955,10 +1001,7 @@ function setupResearchPanel() {
     "align-items:flex-end;" +
     "font:12px system-ui,sans-serif";
 
-  function makeButton(
-    label,
-    fn
-  ) {
+  function makeButton(label, fn) {
     const b =
       document.createElement("button");
 
@@ -972,9 +1015,6 @@ function setupResearchPanel() {
       "background:white;" +
       "color:#111;" +
       "touch-action:manipulation";
-
-    // Prevent research-panel touches
-    // from interfering with the game.
 
     for (
       const type of [
@@ -1000,13 +1040,8 @@ function setupResearchPanel() {
     );
 
     researchPanel.appendChild(b);
-
     return b;
   }
-
-  // ------------------------------------
-  // START / STOP
-  // ------------------------------------
 
   makeButton(
     "Start recording",
@@ -1020,21 +1055,15 @@ function setupResearchPanel() {
 
         b.textContent =
           "Start recording";
-      }
-
-      else {
-        if (
-          !window.sensorsEnabled
-        ) {
+      } else {
+        if (!window.sensorsEnabled) {
           alert(
             "Enable motion sensors first."
           );
-
           return;
         }
 
         researchOn = true;
-
         researchStartedAt =
           performance.now();
 
@@ -1050,18 +1079,10 @@ function setupResearchPanel() {
     }
   );
 
-  // ------------------------------------
-  // EXPORT CSV
-  // ------------------------------------
-
   makeButton(
     "Export CSV",
     exportResearchCSV
   );
-
-  // ------------------------------------
-  // CLEAR DATA
-  // ------------------------------------
 
   makeButton(
     "Clear data",
@@ -1128,8 +1149,7 @@ function researchRow(
     y: rotationY,
 
     z:
-      typeof rotationZ ===
-      "number"
+      typeof rotationZ === "number"
         ? rotationZ
         : "",
 
@@ -1137,7 +1157,6 @@ function researchRow(
       fingerHeld ? 1 : 0,
 
     state: scoopState,
-
     event,
     outcome,
 
@@ -1158,7 +1177,7 @@ function researchRow(
 }
 
 // ========================================
-// RESEARCH MOTION SAMPLES
+// RECORD MOTION SAMPLES
 // ========================================
 
 function recordResearchSample() {
@@ -1171,11 +1190,8 @@ function recordResearchSample() {
 
   const now = performance.now();
 
-  // About 20 samples per second.
-
   if (
-    now - researchLastSample <
-    50
+    now - researchLastSample < 50
   ) {
     return;
   }
@@ -1183,24 +1199,19 @@ function recordResearchSample() {
   researchLastSample = now;
 
   researchRows.push(
-    researchRow(
-      "sample"
-    )
+    researchRow("sample")
   );
 }
 
 // ========================================
-// EXPORT RESEARCH CSV
+// EXPORT CSV
 // ========================================
 
 function exportResearchCSV() {
-  if (
-    !researchRows.length
-  ) {
+  if (!researchRows.length) {
     alert(
       "No research data recorded yet."
     );
-
     return;
   }
 
@@ -1250,39 +1261,27 @@ function exportResearchCSV() {
   );
 
   const url =
-    URL.createObjectURL(
-      blob
-    );
+    URL.createObjectURL(blob);
 
   const link =
-    document.createElement(
-      "a"
-    );
+    document.createElement("a");
 
   link.href = url;
 
   link.download =
-    "scoop-continuous-v3-" +
+    "scoop-player1-v2c-" +
     new Date()
       .toISOString()
-      .replace(
-        /[:.]/g,
-        "-"
-      ) +
+      .replace(/[:.]/g, "-") +
     ".csv";
 
-  document.body.appendChild(
-    link
-  );
+  document.body.appendChild(link);
 
   link.click();
   link.remove();
 
   setTimeout(
-    () =>
-      URL.revokeObjectURL(
-        url
-      ),
+    () => URL.revokeObjectURL(url),
     1000
   );
 }
