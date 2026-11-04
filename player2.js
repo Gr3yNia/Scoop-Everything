@@ -39,8 +39,8 @@ const ART = {
   maxSize: 72,
 
   // Responsive movement.
-  movementStrength: 100,
-  maxSpeed: 9,
+  movementStrength: 35,
+  maxSpeed: 3.5,
 
   // Very low friction loss.
   movingFriction: 0.995,
@@ -349,8 +349,8 @@ function createFragment() {
     ),
 
     // Fragments start with their own motion.
-    vx: random(-1.5, 1.5),
-    vy: random(-1.5, 1.5),
+    vx: random(-0.7, 0.7),
+    vy: random(-0.7, 0.7),
 
     // Individual response to tilt.
     speedFactor: random(0.65, 1.65),
