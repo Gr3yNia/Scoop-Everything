@@ -1,19 +1,15 @@
 
 /*
-  SCOOP EVERYTHING — PLAYER 2 V2C
-  Floating Glass Fragments
+  SCOOP EVERYTHING — PLAYER 02
+  V2C — Responsive Floating Glass
 
-  SCOOP  → Create 3 fragments
-  MOVE   → Guide fragments
-  STILL  → Settle and breathe
-  SHAKE  → Scatter temporarily
+  Hold + scoop: create three fragments
+  Move phone: guide fragments at variable speed
+  Shake: scatter according to shake intensity
+  Still: settle and breathe
 
-  Keeps Player 1's scoop recognition thresholds.
+  Player 1 is not modified.
 */
-
-// ========================================
-// SCOOP CONFIGURATION
-// ========================================
 
 const SCOOP = {
   dip: 0.30,
@@ -25,38 +21,39 @@ const SCOOP = {
   smoothing: 0.25
 };
 
-// ========================================
-// ARTWORK CONFIGURATION
-// ========================================
-
 const ART = {
   background: [233, 234, 240],
 
   fragmentsPerScoop: 3,
   maxFragments: 45,
-
   minSize: 24,
   maxSize: 72,
 
-  // Movement responsiveness.
-  movementStrength: 13,
+  // Motion response.
+  movementStrength: 58,
+  maxSpeed: 14,
+  motionDeadzone: 0.0025,
 
-  // Smaller value = quicker settling.
-  friction: 0.78,
+  // Fragments respond quickly, then settle.
+  movingFriction: 0.985,
+  restingFriction: 0.83,
 
-  maxSpeed: 5.5,
+  // Detect when the phone has become still.
+  stillnessDelay: 130,
 
-  // Ignore very small sensor fluctuations.
-  motionDeadzone: 0.008,
+  // Change these signs if directions feel reversed.
+  horizontalDirection: 1,
+  verticalDirection: 1,
 
-  // Shake settings.
-  shakeThreshold: 3.5,
-  shakeBoost: 3.0,
-  shakeCooldown: 500,
+  // Shake intensity.
+  shakeThreshold: 1.8,
+  shakeMaximum: 15,
+  shakeCooldown: 250,
+  shakeStrength: 0.65,
 
-  // Appearance.
+  // Visuals.
   appearMs: 650,
-  breathingAmount: 0.055,
+  breathingAmount: 0.045,
   breathingSpeed: 0.018
 };
 
@@ -69,10 +66,6 @@ const PALETTE = [
   [238, 230, 223],
   [177, 159, 193]
 ];
-
-// ========================================
-// GLOBAL VARIABLES
-// ========================================
 
 let sensorButton;
 
@@ -88,24 +81,23 @@ let lastFilteredX = null;
 let lastMotionAt = 0;
 let motionSpeedX = 0;
 
-// Fragments.
 let fragments = [];
 let nextFragmentId = 1;
 
-// Motion tracking.
+// Phone orientation.
 let previousTiltX = null;
 let previousTiltY = null;
-
-let smoothedTiltX = null;
-let smoothedTiltY = null;
+let previousMotionTime = null;
 
 let motionX = 0;
 let motionY = 0;
+let motionMagnitude = 0;
+let lastActiveMotionAt = 0;
 
-// Shake tracking.
+// Shake.
+let previousAcceleration = null;
 let lastShakeAt = 0;
 let shakeEnergy = 0;
-let previousAcceleration = null;
 
 // ========================================
 // SETUP
@@ -130,25 +122,11 @@ function setup() {
 
   sensorButton.size(200, 50);
 
-  sensorButton.style(
-    "background", "#343B4D"
-  );
-
-  sensorButton.style(
-    "color", "#FFFFFF"
-  );
-
-  sensorButton.style(
-    "border", "none"
-  );
-
-  sensorButton.style(
-    "border-radius", "25px"
-  );
-
-  sensorButton.style(
-    "font-size", "13px"
-  );
+  sensorButton.style("background", "#343B4D");
+  sensorButton.style("color", "#FFFFFF");
+  sensorButton.style("border", "none");
+  sensorButton.style("border-radius", "25px");
+  sensorButton.style("font-size", "13px");
 
   enableSensorOn("#enable-sensors");
   lockGestures();
@@ -157,15 +135,15 @@ function setup() {
 }
 
 // ========================================
-// MAIN DRAW LOOP
+// MAIN LOOP
 // ========================================
 
 function draw() {
   background(...ART.background);
 
   if (!window.sensorsEnabled) {
-    noStroke();
     fill(52, 59, 77);
+    noStroke();
     textSize(17);
     textAlign(CENTER, CENTER);
 
@@ -197,6 +175,7 @@ function draw() {
     noStroke();
     fill(100, 106, 123);
     textSize(18);
+    textAlign(CENTER, CENTER);
 
     text(
       "Hold + Scoop!",
@@ -211,16 +190,13 @@ function draw() {
 
 // ========================================
 // SCOOP DETECTION
-// SAME AS PLAYER 1
 // ========================================
 
 function updateScoopGesture() {
   const now = performance.now();
   const x = rotationX;
 
-  if (!Number.isFinite(x)) {
-    return;
-  }
+  if (!Number.isFinite(x)) return;
 
   if (!fingerHeld) {
     gesture = null;
@@ -269,118 +245,81 @@ function updateScoopGesture() {
 
   const g = gesture;
 
-  // READY
   if (scoopState === "ready") {
-    g.maxX = Math.max(
-      g.maxX, filtered
-    );
-
+    g.maxX = Math.max(g.maxX, filtered);
     g.baseline = g.maxX;
 
-    if (
-      g.maxX - filtered >= SCOOP.dip
-    ) {
+    if (g.maxX - filtered >= SCOOP.dip) {
       g.minX = filtered;
       g.start = now;
       scoopState = "dipped";
     }
   }
 
-  // DIPPED
   else if (scoopState === "dipped") {
-    g.minX = Math.min(
-      g.minX, filtered
-    );
+    g.minX = Math.min(g.minX, filtered);
 
-    if (
-      now - g.start > SCOOP.maxMs
-    ) {
+    if (now - g.start > SCOOP.maxMs) {
       g.maxX = filtered;
       g.baseline = filtered;
       g.minX = filtered;
-
       scoopState = "ready";
     }
 
     else if (
-      filtered - g.minX >=
-        SCOOP.reversal &&
-
-      now - g.start >=
-        SCOOP.minMs &&
-
+      filtered - g.minX >= SCOOP.reversal &&
+      now - g.start >= SCOOP.minMs &&
       motionSpeedX > 0.03 &&
-
-      now - g.lastSuccess >=
-        SCOOP.cooldownMs
+      now - g.lastSuccess >= SCOOP.cooldownMs
     ) {
       addScoop();
 
       g.lastSuccess = now;
       g.cycle++;
-
       g.reversalPeak = filtered;
+
       scoopState = "rearm";
     }
   }
 
-  // REARM
   else if (scoopState === "rearm") {
     g.reversalPeak = Math.max(
-      g.reversalPeak, filtered
+      g.reversalPeak,
+      filtered
     );
 
     if (
-      now - g.lastSuccess >=
-        SCOOP.cooldownMs &&
-
-      g.reversalPeak - filtered >=
-        SCOOP.rearm
+      now - g.lastSuccess >= SCOOP.cooldownMs &&
+      g.reversalPeak - filtered >= SCOOP.rearm
     ) {
       g.maxX = g.reversalPeak;
       g.baseline = g.maxX;
       g.minX = filtered;
       g.start = now;
 
-      if (
+      scoopState =
         g.maxX - filtered >= SCOOP.dip
-      ) {
-        scoopState = "dipped";
-      } else {
-        scoopState = "ready";
-      }
+          ? "dipped"
+          : "ready";
     }
   }
 }
 
 // ========================================
-// SCOOP SUCCESS
+// CREATE FRAGMENTS
 // ========================================
 
 function addScoop() {
   totalScoops++;
 
-  for (
-    let i = 0;
-    i < ART.fragmentsPerScoop;
-    i++
-  ) {
-    fragments.push(
-      createFragment()
-    );
+  for (let i = 0; i < ART.fragmentsPerScoop; i++) {
+    fragments.push(createFragment());
   }
 
-  while (
-    fragments.length >
-    ART.maxFragments
-  ) {
+  while (fragments.length > ART.maxFragments) {
     fragments.shift();
   }
 }
-
-// ========================================
-// CREATE FRAGMENT
-// ========================================
 
 function createFragment() {
   const size = random(
@@ -388,7 +327,7 @@ function createFragment() {
     ART.maxSize
   );
 
-  const margin = size * 0.7;
+  const margin = size * 0.65;
 
   return {
     id: nextFragmentId++,
@@ -399,39 +338,39 @@ function createFragment() {
     ),
 
     y: random(
-      145,
-      max(146, height - 90)
+      min(100, height * 0.25),
+      max(101, height - 55)
     ),
 
-    // Begin nearly still.
-    vx: random(-0.15, 0.15),
-    vy: random(-0.15, 0.15),
+    vx: 0,
+    vy: 0,
 
-    // Each fragment moves differently.
-    speedFactor: random(0.55, 1.8),
+    // Different response speeds.
+    speedFactor: random(0.65, 1.65),
 
     size,
-
     rotation: random(TWO_PI),
+
     rotationSpeed: random(
-      -0.008, 0.008
+      -0.008,
+      0.008
     ),
 
     color: [...random(PALETTE)],
-
     shape: floor(random(4)),
-
     phase: random(TWO_PI),
-
     createdAt: millis()
   };
 }
 
 // ========================================
-// DETECT PHONE MOVEMENT
+// PHONE MOVEMENT
 // ========================================
 
 function updatePhoneMovement() {
+  const now = performance.now();
+
+  // Phone left/right and forward/back tilt.
   const rawX = rotationY;
   const rawY = rotationX;
 
@@ -441,188 +380,198 @@ function updatePhoneMovement() {
   ) {
     motionX = 0;
     motionY = 0;
+    motionMagnitude = 0;
     return;
   }
 
-  // Smooth sensor noise.
-  const smoothing = 0.22;
-
-  if (smoothedTiltX === null) {
-    smoothedTiltX = rawX;
-    smoothedTiltY = rawY;
-
+  if (
+    previousTiltX === null ||
+    previousTiltY === null
+  ) {
     previousTiltX = rawX;
     previousTiltY = rawY;
-
-    motionX = 0;
-    motionY = 0;
+    previousMotionTime = now;
+    lastActiveMotionAt = now;
     return;
   }
 
-  smoothedTiltX +=
-    (rawX - smoothedTiltX) *
-    smoothing;
+  const dt = constrain(
+    (now - previousMotionTime) / 1000,
+    0.008,
+    0.1
+  );
 
-  smoothedTiltY +=
-    (rawY - smoothedTiltY) *
-    smoothing;
+  // Actual change in phone angle.
+  const deltaX = rawX - previousTiltX;
+  const deltaY = rawY - previousTiltY;
 
-  // Calculate CHANGE in angle,
-  // rather than the angle itself.
-
-  const deltaX =
-    smoothedTiltX -
-    previousTiltX;
-
-  const deltaY =
-    smoothedTiltY -
-    previousTiltY;
-
-  previousTiltX = smoothedTiltX;
-  previousTiltY = smoothedTiltY;
+  previousTiltX = rawX;
+  previousTiltY = rawY;
+  previousMotionTime = now;
 
   // Ignore tiny sensor fluctuations.
-
-  motionX =
-    abs(deltaX) >
-    ART.motionDeadzone
+  const cleanX =
+    abs(deltaX) > ART.motionDeadzone
       ? deltaX
       : 0;
 
-  motionY =
-    abs(deltaY) >
-    ART.motionDeadzone
+  const cleanY =
+    abs(deltaY) > ART.motionDeadzone
       ? deltaY
       : 0;
+
+  // Angular movement per second.
+  // Faster tilts produce larger values.
+  motionX = constrain(
+    (cleanX / dt) * ART.horizontalDirection,
+    -8,
+    8
+  );
+
+  motionY = constrain(
+    (cleanY / dt) * ART.verticalDirection,
+    -8,
+    8
+  );
+
+  motionMagnitude = sqrt(
+    motionX * motionX +
+    motionY * motionY
+  );
+
+  if (motionMagnitude > 0.035) {
+    lastActiveMotionAt = now;
+  }
 }
 
 // ========================================
-// FRAGMENT MOVEMENT
+// FRAGMENT PHYSICS
 // ========================================
 
 function updateFragment(f) {
-  // Individual response to phone movement.
+  const now = performance.now();
 
-  const accelerationX =
+  const phoneRecentlyMoved =
+    now - lastActiveMotionAt <
+    ART.stillnessDelay;
+
+  // Convert movement speed into force.
+  // A slow tilt creates a small force.
+  // A fast tilt creates a strong force.
+  const forceX =
     motionX *
     ART.movementStrength *
-    f.speedFactor;
+    f.speedFactor / 60;
 
-  const accelerationY =
+  const forceY =
     motionY *
     ART.movementStrength *
-    f.speedFactor;
+    f.speedFactor / 60;
 
-  f.vx += accelerationX;
-  f.vy += accelerationY;
+  f.vx += forceX;
+  f.vy += forceY;
 
-  // Strong damping: fragments settle
-  // when phone movement stops.
+  // Only apply stronger damping
+  // after the phone becomes still.
+  const damping = phoneRecentlyMoved
+    ? ART.movingFriction
+    : ART.restingFriction;
 
-  f.vx *= ART.friction;
-  f.vy *= ART.friction;
+  f.vx *= damping;
+  f.vy *= damping;
 
-  // Stop tiny residual movement.
-
-  if (abs(f.vx) < 0.025) {
-    f.vx = 0;
-  }
-
-  if (abs(f.vy) < 0.025) {
-    f.vy = 0;
-  }
-
-  const speedLimit =
+  // Limit total velocity.
+  const maxV =
     ART.maxSpeed +
-    shakeEnergy * ART.shakeBoost;
+    shakeEnergy * 5;
 
-  f.vx = constrain(
-    f.vx,
-    -speedLimit,
-    speedLimit
-  );
-
-  f.vy = constrain(
-    f.vy,
-    -speedLimit,
-    speedLimit
-  );
-
-  f.x += f.vx;
-  f.y += f.vy;
-
-  // Rotate only when moving.
-
-  const movement = sqrt(
+  const speed = sqrt(
     f.vx * f.vx +
     f.vy * f.vy
   );
 
-  if (movement > 0.08) {
+  if (speed > maxV) {
+    const factor = maxV / speed;
+    f.vx *= factor;
+    f.vy *= factor;
+  }
+
+  // Stop only after motion has settled.
+  if (!phoneRecentlyMoved) {
+    if (abs(f.vx) < 0.035) f.vx = 0;
+    if (abs(f.vy) < 0.035) f.vy = 0;
+  }
+
+  f.x += f.vx;
+  f.y += f.vy;
+
+  // Rotation follows movement.
+  const currentSpeed = sqrt(
+    f.vx * f.vx +
+    f.vy * f.vy
+  );
+
+  if (currentSpeed > 0.06) {
     f.rotation +=
       f.rotationSpeed *
-      movement *
-      (1 + shakeEnergy);
+      currentSpeed;
   }
 
-  // Boundaries.
+  // Keep fragments visible.
+  const margin = f.size * 0.55;
 
-  const margin = f.size * 0.5;
+  const minX = margin;
+  const maxX = max(margin, width - margin);
 
-  if (f.x < margin) {
-    f.x = margin;
-    f.vx = abs(f.vx) * 0.35;
+  const minY = min(90, height * 0.2);
+  const maxY = max(
+    minY,
+    height - max(35, height * 0.07)
+  );
+
+  if (f.x < minX) {
+    f.x = minX;
+    f.vx = abs(f.vx) * 0.25;
   }
 
-  if (f.x > width - margin) {
-    f.x = width - margin;
-    f.vx = -abs(f.vx) * 0.35;
+  if (f.x > maxX) {
+    f.x = maxX;
+    f.vx = -abs(f.vx) * 0.25;
   }
 
-  if (f.y < 130) {
-    f.y = 130;
-    f.vy = abs(f.vy) * 0.35;
+  if (f.y < minY) {
+    f.y = minY;
+    f.vy = abs(f.vy) * 0.25;
   }
 
-  if (f.y > height - 65) {
-    f.y = height - 65;
-    f.vy = -abs(f.vy) * 0.35;
+  if (f.y > maxY) {
+    f.y = maxY;
+    f.vy = -abs(f.vy) * 0.25;
   }
 }
 
 // ========================================
-// SHAKE DETECTION
+// VARIABLE-STRENGTH SHAKE
 // ========================================
 
 function updateShake() {
   const now = millis();
 
-  const ax =
-    typeof accelerationX === "number"
-      ? accelerationX : 0;
+  const ax = Number.isFinite(accelerationX)
+    ? accelerationX : 0;
 
-  const ay =
-    typeof accelerationY === "number"
-      ? accelerationY : 0;
+  const ay = Number.isFinite(accelerationY)
+    ? accelerationY : 0;
 
-  const az =
-    typeof accelerationZ === "number"
-      ? accelerationZ : 0;
+  const az = Number.isFinite(accelerationZ)
+    ? accelerationZ : 0;
 
   const current = { ax, ay, az };
 
   if (previousAcceleration !== null) {
-    const dx =
-      current.ax -
-      previousAcceleration.ax;
-
-    const dy =
-      current.ay -
-      previousAcceleration.ay;
-
-    const dz =
-      current.az -
-      previousAcceleration.az;
+    const dx = ax - previousAcceleration.ax;
+    const dy = ay - previousAcceleration.ay;
+    const dz = az - previousAcceleration.az;
 
     const change = sqrt(
       dx * dx +
@@ -632,36 +581,53 @@ function updateShake() {
 
     if (
       change > ART.shakeThreshold &&
-      now - lastShakeAt >
-        ART.shakeCooldown
+      now - lastShakeAt > ART.shakeCooldown
     ) {
-      triggerShake();
+      const intensity = constrain(
+        map(
+          change,
+          ART.shakeThreshold,
+          ART.shakeMaximum,
+          0.15,
+          1
+        ),
+        0.15,
+        1
+      );
+
+      triggerShake(intensity);
       lastShakeAt = now;
     }
   }
 
   previousAcceleration = current;
 
-  // Shake energy fades naturally.
-
-  shakeEnergy *= 0.90;
+  shakeEnergy *= 0.88;
 
   if (shakeEnergy < 0.005) {
     shakeEnergy = 0;
   }
 }
 
-function triggerShake() {
-  shakeEnergy = 1;
+function triggerShake(intensity) {
+  shakeEnergy = intensity;
+
+  const force =
+    intensity *
+    ART.shakeStrength *
+    10;
 
   for (const f of fragments) {
-    f.vx += random(-3.2, 3.2);
-    f.vy += random(-3.2, 3.2);
+    f.vx += random(-force, force) *
+      f.speedFactor;
+
+    f.vy += random(-force, force) *
+      f.speedFactor;
   }
 }
 
 // ========================================
-// DRAW FRAGMENT
+// DRAW GLASS FRAGMENT
 // ========================================
 
 function drawFragment(f) {
@@ -672,21 +638,16 @@ function drawFragment(f) {
     1
   );
 
-  const alpha = 165 * appear;
-
   push();
 
   translate(f.x, f.y);
   rotate(f.rotation);
 
   // Breathing in place.
-  // No positional movement.
-
   const breathing =
     1 +
     sin(
-      frameCount *
-      ART.breathingSpeed +
+      frameCount * ART.breathingSpeed +
       f.phase
     ) *
     ART.breathingAmount;
@@ -696,30 +657,29 @@ function drawFragment(f) {
   const c = f.color;
   const s = f.size;
 
-  // Gentle shadow.
-
+  // Very subtle shadow.
   noStroke();
 
   fill(
     c[0],
     c[1],
     c[2],
-    22 * appear
+    18 * appear
   );
 
   ellipse(
-    3, 5,
-    s * 1.25,
-    s * 0.85
+    3,
+    5,
+    s * 1.1,
+    s * 0.75
   );
 
-  // Translucent glass.
-
+  // Coloured glass.
   fill(
     c[0],
     c[1],
     c[2],
-    alpha
+    165 * appear
   );
 
   stroke(
@@ -733,52 +693,32 @@ function drawFragment(f) {
 
   if (f.shape === 0) {
     rectMode(CENTER);
-
-    rect(
-      0, 0,
-      s,
-      s * 0.46,
-      3
-    );
+    rect(0, 0, s, s * 0.46, 3);
   }
 
   else if (f.shape === 1) {
     beginShape();
-
     vertex(-s * 0.5, -s * 0.25);
     vertex(s * 0.25, -s * 0.4);
     vertex(s * 0.5, s * 0.2);
     vertex(-s * 0.2, s * 0.35);
-
     endShape(CLOSE);
   }
 
   else if (f.shape === 2) {
     triangle(
-      -s * 0.45,
-      s * 0.3,
-
-      0,
-      -s * 0.45,
-
-      s * 0.5,
-      s * 0.25
+      -s * 0.45, s * 0.3,
+      0, -s * 0.45,
+      s * 0.5, s * 0.25
     );
   }
 
   else {
     rectMode(CENTER);
-
-    rect(
-      0, 0,
-      s * 0.5,
-      s * 0.9,
-      5
-    );
+    rect(0, 0, s * 0.5, s * 0.9, 5);
   }
 
-  // No white dots or touch handles.
-
+  // No white dots or handles.
   pop();
 }
 
@@ -787,17 +727,11 @@ function drawFragment(f) {
 // ========================================
 
 function updateFinger() {
-  const empty =
-    touches.length === 0;
+  const empty = touches.length === 0;
 
   if (trackedFingerId === null) {
-    if (
-      !empty &&
-      touchesWereEmpty
-    ) {
-      trackedFingerId =
-        touches[0].id;
-
+    if (!empty && touchesWereEmpty) {
+      trackedFingerId = touches[0].id;
       fingerHeld = true;
     }
   }
@@ -805,15 +739,8 @@ function updateFinger() {
   else {
     let stillDown = false;
 
-    for (
-      let i = 0;
-      i < touches.length;
-      i++
-    ) {
-      if (
-        touches[i].id ===
-        trackedFingerId
-      ) {
+    for (let i = 0; i < touches.length; i++) {
+      if (touches[i].id === trackedFingerId) {
         stillDown = true;
         break;
       }
@@ -822,19 +749,15 @@ function updateFinger() {
     if (!stillDown) {
       trackedFingerId = null;
       fingerHeld = false;
-
       scoopState = "waiting";
       gesture = null;
-
       lastFilteredX = null;
       lastMotionAt = 0;
       motionSpeedX = 0;
     }
   }
 
-  fingerHeld =
-    trackedFingerId !== null;
-
+  fingerHeld = trackedFingerId !== null;
   touchesWereEmpty = empty;
 }
 
@@ -849,7 +772,7 @@ function mouseReleased() {
 }
 
 // ========================================
-// DEBUG INFORMATION
+// DEBUG
 // ========================================
 
 function drawDebug() {
@@ -860,40 +783,30 @@ function drawDebug() {
   textAlign(LEFT, TOP);
 
   const x = Number.isFinite(rotationX)
-    ? rotationX.toFixed(2)
-    : "-";
+    ? rotationX.toFixed(2) : "-";
 
   const y = Number.isFinite(rotationY)
-    ? rotationY.toFixed(2)
-    : "-";
+    ? rotationY.toFixed(2) : "-";
 
-  // Position below Player 02 label.
   const top = 100;
 
   text("rotationX " + x, 24, top);
   text("rotationY " + y, 24, top + 18);
 
   text(
-    "finger " +
-    (fingerHeld ? "down" : "up"),
-    24, top + 36
+    "finger " + (fingerHeld ? "down" : "up"),
+    24,
+    top + 36
   );
 
-  text(
-    "state " + scoopState,
-    24, top + 54
-  );
+  text("state " + scoopState, 24, top + 54);
+  text("successful scoops " + totalScoops, 24, top + 72);
+  text("floating fragments " + fragments.length, 24, top + 90);
 
   text(
-    "successful scoops " +
-    totalScoops,
-    24, top + 72
-  );
-
-  text(
-    "floating fragments " +
-    fragments.length,
-    24, top + 90
+    "movement " + motionMagnitude.toFixed(2),
+    24,
+    top + 108
   );
 
   textAlign(CENTER, CENTER);
@@ -918,17 +831,14 @@ function drawInstructions() {
 }
 
 // ========================================
-// WINDOW RESIZE
+// RESIZE
 // ========================================
 
 function windowResized() {
   const oldW = width;
   const oldH = height;
 
-  resizeCanvas(
-    windowWidth,
-    windowHeight
-  );
+  resizeCanvas(windowWidth, windowHeight);
 
   for (const f of fragments) {
     f.x *= width / oldW;
