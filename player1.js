@@ -87,7 +87,6 @@ function setup() {
     me: { name: "Player 01", role: 1 }
   });
 
-  enablePermissionsTap(["share"], "Join Shared Artwork");
 
   setupResearchPanel();
   textAlign(CENTER, CENTER);
