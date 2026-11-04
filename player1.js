@@ -1,18 +1,21 @@
 
 /*
   SCOOP EVERYTHING — PLAYER 1 V2C
-  Layered Kaleidoscopes
+  Layered Kaleidoscopes / Scoop Memory
 
-  Each scoop:
-  - Adds a new kaleidoscope
-  - Keeps previous artwork
-  - Softly fades older layers
-  - Preserves continuous scoop detection
-  - Preserves CSV research recording
+  Every successful scoop:
+  - Adds a new independent kaleidoscope
+  - New artwork fades in gently
+  - Previous artworks fade one level
+  - Old artworks never suddenly disappear
+  - No fading happens simply because time passes
+
+  Preserves V2B continuous scoop detection
+  and research CSV recording.
 */
 
 // ========================================
-// SCOOP DETECTION — ORIGINAL SETTINGS
+// SCOOP CONFIGURATION — UNCHANGED
 // ========================================
 
 const SCOOP = {
@@ -26,26 +29,31 @@ const SCOOP = {
 };
 
 // ========================================
-// ARTWORK SETTINGS
+// ARTWORK CONFIGURATION
 // ========================================
 
 const ART = {
   background: [233, 234, 240],
+
   maxLayers: 24,
 
-  // Newest artwork is fully visible.
+  // Newest artwork stays fully visible.
   newestOpacity: 1,
 
-  // Older artwork stays visible but soft.
-  oldestOpacity: 0.12,
+  // Oldest artwork is nearly invisible.
+  oldestOpacity: 0.06,
 
-  // Number of layers that fade gradually.
-  fadeLayers: 9,
+  // Takes 10 newer scoops to reach
+  // the minimum opacity.
+  fadeLayers: 10,
 
-  // Duration of the new artwork appearing.
+  // New artwork gently appears.
   appearMs: 650,
 
-  // General size of each kaleidoscope.
+  // Existing layers smoothly fade
+  // when another scoop is created.
+  transitionMs: 850,
+
   minRadius: 0.12,
   maxRadius: 0.23
 };
@@ -78,7 +86,7 @@ let lastFilteredX = null;
 let lastMotionAt = 0;
 let motionSpeedX = 0;
 
-// Each artwork is stored independently.
+// Artwork collection.
 let kaleidoscopes = [];
 let nextArtworkId = 1;
 
@@ -97,6 +105,7 @@ let researchStartedAt = 0;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
+
   pixelDensity(1);
 
   sensorButton = createButton(
@@ -158,12 +167,10 @@ function draw() {
     sensorButton.hide();
   }
 
-  // Original working interaction.
   updateFinger();
   updateScoopGesture();
   recordResearchSample();
 
-  // Draw accumulated layers.
   drawAllKaleidoscopes();
 
   if (kaleidoscopes.length === 0) {
@@ -344,19 +351,39 @@ function updateScoopGesture() {
 }
 
 // ========================================
-// EACH SCOOP ADDS ONE ARTWORK
+// SCOOP SUCCESS
 // ========================================
 
 function addScoop() {
   totalScoops++;
 
-  // Create a new independent artwork.
+  const now = millis();
+
+  // Freeze the current opacity as the
+  // starting point of each transition.
+  //
+  // This also works if the player scoops
+  // again before the previous fade ends.
+
+  for (const k of kaleidoscopes) {
+    k.opacityFrom = k.opacity;
+    k.opacityTo = max(
+      ART.oldestOpacity,
+      k.opacityTo -
+        (ART.newestOpacity -
+         ART.oldestOpacity) /
+        ART.fadeLayers
+    );
+
+    k.transitionStartedAt = now;
+  }
+
+  // Add a completely new artwork.
   const newArtwork = createKaleidoscope();
 
-  // Add without clearing previous artwork.
   kaleidoscopes.push(newArtwork);
 
-  // Keep a reasonable performance limit.
+  // Limit rendering work on phones.
   if (
     kaleidoscopes.length >
     ART.maxLayers
@@ -377,8 +404,6 @@ function createKaleidoscope() {
     shortest * ART.maxRadius
   );
 
-  // Distribute artwork across the screen.
-  // Avoid the debug panel at the top.
   const margin = radius * 0.6;
 
   const left = margin;
@@ -403,7 +428,6 @@ function createKaleidoscope() {
   }
 
   const fragments = [];
-
   const count = floor(random(6, 11));
 
   for (let i = 0; i < count; i++) {
@@ -454,12 +478,60 @@ function createKaleidoscope() {
       0.006, 0.014
     ),
 
-    createdAt: millis()
+    // NEW OPACITY SYSTEM
+
+    opacity: 0,
+    opacityFrom: 0,
+    opacityTo: ART.newestOpacity,
+
+    createdAt: millis(),
+    transitionStartedAt: millis()
   };
 }
 
 // ========================================
-// DRAW ALL LAYERS
+// EASING FUNCTION
+// ========================================
+
+// Smooth start and finish for fading.
+
+function smoothFade(t) {
+  t = constrain(t, 0, 1);
+
+  return t * t * (3 - 2 * t);
+}
+
+// ========================================
+// UPDATE ARTWORK OPACITY
+// ========================================
+
+function updateArtworkOpacity(k) {
+  const now = millis();
+
+  const isNew =
+    k.opacityFrom === 0 &&
+    k.opacityTo === ART.newestOpacity;
+
+  const duration = isNew
+    ? ART.appearMs
+    : ART.transitionMs;
+
+  const elapsed =
+    now - k.transitionStartedAt;
+
+  const progress = smoothFade(
+    elapsed / duration
+  );
+
+  k.opacity = lerp(
+    k.opacityFrom,
+    k.opacityTo,
+    progress
+  );
+}
+
+// ========================================
+// DRAW ALL KALEIDOSCOPES
 // ========================================
 
 function drawAllKaleidoscopes() {
@@ -468,39 +540,21 @@ function drawAllKaleidoscopes() {
   for (let i = 0; i < count; i++) {
     const k = kaleidoscopes[i];
 
-    // Age 0 means newest artwork.
+    updateArtworkOpacity(k);
+
     const age = count - 1 - i;
 
-    // Older artworks become increasingly
-    // transparent, but never fully vanish.
-    const fadeProgress = constrain(
+    // Old artwork moves more slowly.
+    const ageProgress = constrain(
       age / ART.fadeLayers,
       0,
       1
     );
 
-    const targetOpacity = lerp(
-      ART.newestOpacity,
-      ART.oldestOpacity,
-      fadeProgress
-    );
-
-    // Fade in each newly created artwork.
-    const appear = constrain(
-      (millis() - k.createdAt) /
-      ART.appearMs,
-      0,
-      1
-    );
-
-    const opacity =
-      targetOpacity * appear;
-
-    // Older artwork rotates more slowly.
     const speedMultiplier = lerp(
       1,
       0.2,
-      fadeProgress
+      ageProgress
     );
 
     k.rotation +=
@@ -527,7 +581,7 @@ function drawAllKaleidoscopes() {
       k,
       x,
       y,
-      opacity
+      k.opacity
     );
   }
 }
@@ -556,7 +610,7 @@ function drawKaleidoscope(
   scale(breathing);
   rotate(k.rotation);
 
-  // Very soft circular glow.
+  // Soft atmospheric glow.
   const glow = k.colors[0];
 
   noStroke();
@@ -601,7 +655,7 @@ function drawKaleidoscope(
     pop();
   }
 
-  // Subtle centre.
+  // Delicate centre.
   noFill();
 
   stroke(
@@ -755,7 +809,7 @@ function drawGlassFragment(
     );
   }
 
-  // Gentle glass reflection.
+  // Gentle reflection.
   noStroke();
 
   fill(
