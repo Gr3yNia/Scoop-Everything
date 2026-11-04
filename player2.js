@@ -1,19 +1,18 @@
 
 /*
   SCOOP EVERYTHING — PLAYER 2 V2C
+  Floating Glass Fragments
 
-  Scoop: creates 3 floating glass fragments
-  Tilt: guides all fragments across the screen
-  Shake: temporarily increases their movement
+  SCOOP  → Create 3 fragments
+  MOVE   → Guide fragments
+  STILL  → Settle and breathe
+  SHAKE  → Scatter temporarily
 
-  Uses the same scoop recognition thresholds
-  as Player 1.
-
-  Player 2 remains independent from Player 1.
+  Keeps Player 1's scoop recognition thresholds.
 */
 
 // ========================================
-// SCOOP SETTINGS
+// SCOOP CONFIGURATION
 // ========================================
 
 const SCOOP = {
@@ -27,7 +26,7 @@ const SCOOP = {
 };
 
 // ========================================
-// ARTWORK SETTINGS
+// ARTWORK CONFIGURATION
 // ========================================
 
 const ART = {
@@ -39,15 +38,26 @@ const ART = {
   minSize: 24,
   maxSize: 72,
 
-  tiltStrength: 0.12,
-  friction: 0.94,
-  maxSpeed: 2.8,
+  // Movement responsiveness.
+  movementStrength: 13,
 
+  // Smaller value = quicker settling.
+  friction: 0.78,
+
+  maxSpeed: 5.5,
+
+  // Ignore very small sensor fluctuations.
+  motionDeadzone: 0.008,
+
+  // Shake settings.
   shakeThreshold: 3.5,
-  shakeBoost: 2.6,
+  shakeBoost: 3.0,
   shakeCooldown: 500,
 
-  appearMs: 650
+  // Appearance.
+  appearMs: 650,
+  breathingAmount: 0.055,
+  breathingSpeed: 0.018
 };
 
 const PALETTE = [
@@ -78,9 +88,21 @@ let lastFilteredX = null;
 let lastMotionAt = 0;
 let motionSpeedX = 0;
 
+// Fragments.
 let fragments = [];
 let nextFragmentId = 1;
 
+// Motion tracking.
+let previousTiltX = null;
+let previousTiltY = null;
+
+let smoothedTiltX = null;
+let smoothedTiltY = null;
+
+let motionX = 0;
+let motionY = 0;
+
+// Shake tracking.
 let lastShakeAt = 0;
 let shakeEnergy = 0;
 let previousAcceleration = null;
@@ -135,7 +157,7 @@ function setup() {
 }
 
 // ========================================
-// MAIN LOOP
+// MAIN DRAW LOOP
 // ========================================
 
 function draw() {
@@ -145,6 +167,7 @@ function draw() {
     noStroke();
     fill(52, 59, 77);
     textSize(17);
+    textAlign(CENTER, CENTER);
 
     text(
       "Tap the button to start",
@@ -162,6 +185,7 @@ function draw() {
   updateFinger();
   updateScoopGesture();
 
+  updatePhoneMovement();
   updateShake();
 
   for (const f of fragments) {
@@ -187,7 +211,7 @@ function draw() {
 
 // ========================================
 // SCOOP DETECTION
-// SAME THRESHOLDS AS PLAYER 1
+// SAME AS PLAYER 1
 // ========================================
 
 function updateScoopGesture() {
@@ -245,6 +269,7 @@ function updateScoopGesture() {
 
   const g = gesture;
 
+  // READY
   if (scoopState === "ready") {
     g.maxX = Math.max(
       g.maxX, filtered
@@ -261,6 +286,7 @@ function updateScoopGesture() {
     }
   }
 
+  // DIPPED
   else if (scoopState === "dipped") {
     g.minX = Math.min(
       g.minX, filtered
@@ -298,6 +324,7 @@ function updateScoopGesture() {
     }
   }
 
+  // REARM
   else if (scoopState === "rearm") {
     g.reversalPeak = Math.max(
       g.reversalPeak, filtered
@@ -327,7 +354,7 @@ function updateScoopGesture() {
 }
 
 // ========================================
-// CREATE FRAGMENTS WITH EACH SCOOP
+// SCOOP SUCCESS
 // ========================================
 
 function addScoop() {
@@ -352,7 +379,7 @@ function addScoop() {
 }
 
 // ========================================
-// FRAGMENT CREATION
+// CREATE FRAGMENT
 // ========================================
 
 function createFragment() {
@@ -376,8 +403,12 @@ function createFragment() {
       max(146, height - 90)
     ),
 
-    vx: random(-0.4, 0.4),
-    vy: random(-0.4, 0.4),
+    // Begin nearly still.
+    vx: random(-0.15, 0.15),
+    vy: random(-0.15, 0.15),
+
+    // Each fragment moves differently.
+    speedFactor: random(0.55, 1.8),
 
     size,
 
@@ -397,49 +428,109 @@ function createFragment() {
 }
 
 // ========================================
-// TILT MOVEMENT
+// DETECT PHONE MOVEMENT
+// ========================================
+
+function updatePhoneMovement() {
+  const rawX = rotationY;
+  const rawY = rotationX;
+
+  if (
+    !Number.isFinite(rawX) ||
+    !Number.isFinite(rawY)
+  ) {
+    motionX = 0;
+    motionY = 0;
+    return;
+  }
+
+  // Smooth sensor noise.
+  const smoothing = 0.22;
+
+  if (smoothedTiltX === null) {
+    smoothedTiltX = rawX;
+    smoothedTiltY = rawY;
+
+    previousTiltX = rawX;
+    previousTiltY = rawY;
+
+    motionX = 0;
+    motionY = 0;
+    return;
+  }
+
+  smoothedTiltX +=
+    (rawX - smoothedTiltX) *
+    smoothing;
+
+  smoothedTiltY +=
+    (rawY - smoothedTiltY) *
+    smoothing;
+
+  // Calculate CHANGE in angle,
+  // rather than the angle itself.
+
+  const deltaX =
+    smoothedTiltX -
+    previousTiltX;
+
+  const deltaY =
+    smoothedTiltY -
+    previousTiltY;
+
+  previousTiltX = smoothedTiltX;
+  previousTiltY = smoothedTiltY;
+
+  // Ignore tiny sensor fluctuations.
+
+  motionX =
+    abs(deltaX) >
+    ART.motionDeadzone
+      ? deltaX
+      : 0;
+
+  motionY =
+    abs(deltaY) >
+    ART.motionDeadzone
+      ? deltaY
+      : 0;
+}
+
+// ========================================
+// FRAGMENT MOVEMENT
 // ========================================
 
 function updateFragment(f) {
-  // Phone tilt steers the fragments.
-  // Clamp values to prevent wild motion.
-
-  const tiltX = Number.isFinite(rotationY)
-    ? constrain(rotationY, -0.8, 0.8)
-    : 0;
-
-  const tiltY = Number.isFinite(rotationX)
-    ? constrain(rotationX, -0.8, 0.8)
-    : 0;
+  // Individual response to phone movement.
 
   const accelerationX =
-    tiltX * ART.tiltStrength;
+    motionX *
+    ART.movementStrength *
+    f.speedFactor;
 
   const accelerationY =
-    tiltY * ART.tiltStrength;
+    motionY *
+    ART.movementStrength *
+    f.speedFactor;
 
-  // Slight individual floating movement.
+  f.vx += accelerationX;
+  f.vy += accelerationY;
 
-  const floatingX =
-    sin(
-      frameCount * 0.012 +
-      f.phase
-    ) * 0.012;
-
-  const floatingY =
-    cos(
-      frameCount * 0.01 +
-      f.phase
-    ) * 0.012;
-
-  f.vx += accelerationX + floatingX;
-  f.vy += accelerationY + floatingY;
+  // Strong damping: fragments settle
+  // when phone movement stops.
 
   f.vx *= ART.friction;
   f.vy *= ART.friction;
 
-  // Shake adds temporary energy,
-  // but speed always remains capped.
+  // Stop tiny residual movement.
+
+  if (abs(f.vx) < 0.025) {
+    f.vx = 0;
+  }
+
+  if (abs(f.vy) < 0.025) {
+    f.vy = 0;
+  }
 
   const speedLimit =
     ART.maxSpeed +
@@ -460,32 +551,42 @@ function updateFragment(f) {
   f.x += f.vx;
   f.y += f.vy;
 
-  f.rotation +=
-    f.rotationSpeed *
-    (1 + shakeEnergy);
+  // Rotate only when moving.
 
-  // Soft bounce at the boundaries.
+  const movement = sqrt(
+    f.vx * f.vx +
+    f.vy * f.vy
+  );
+
+  if (movement > 0.08) {
+    f.rotation +=
+      f.rotationSpeed *
+      movement *
+      (1 + shakeEnergy);
+  }
+
+  // Boundaries.
 
   const margin = f.size * 0.5;
 
   if (f.x < margin) {
     f.x = margin;
-    f.vx = abs(f.vx) * 0.45;
+    f.vx = abs(f.vx) * 0.35;
   }
 
   if (f.x > width - margin) {
     f.x = width - margin;
-    f.vx = -abs(f.vx) * 0.45;
+    f.vx = -abs(f.vx) * 0.35;
   }
 
   if (f.y < 130) {
     f.y = 130;
-    f.vy = abs(f.vy) * 0.45;
+    f.vy = abs(f.vy) * 0.35;
   }
 
   if (f.y > height - 65) {
     f.y = height - 65;
-    f.vy = -abs(f.vy) * 0.45;
+    f.vy = -abs(f.vy) * 0.35;
   }
 }
 
@@ -541,8 +642,9 @@ function updateShake() {
 
   previousAcceleration = current;
 
-  // Gradually return to normal.
-  shakeEnergy *= 0.94;
+  // Shake energy fades naturally.
+
+  shakeEnergy *= 0.90;
 
   if (shakeEnergy < 0.005) {
     shakeEnergy = 0;
@@ -553,8 +655,8 @@ function triggerShake() {
   shakeEnergy = 1;
 
   for (const f of fragments) {
-    f.vx += random(-2.2, 2.2);
-    f.vy += random(-2.2, 2.2);
+    f.vx += random(-3.2, 3.2);
+    f.vy += random(-3.2, 3.2);
   }
 }
 
@@ -577,12 +679,17 @@ function drawFragment(f) {
   translate(f.x, f.y);
   rotate(f.rotation);
 
+  // Breathing in place.
+  // No positional movement.
+
   const breathing =
     1 +
     sin(
-      frameCount * 0.018 +
+      frameCount *
+      ART.breathingSpeed +
       f.phase
-    ) * 0.06;
+    ) *
+    ART.breathingAmount;
 
   scale(breathing);
 
@@ -606,7 +713,7 @@ function drawFragment(f) {
     s * 0.85
   );
 
-  // Main glass fragment.
+  // Translucent glass.
 
   fill(
     c[0],
@@ -670,22 +777,7 @@ function drawFragment(f) {
     );
   }
 
-  // Translucent highlight.
-
-  noStroke();
-
-  fill(
-    255,
-    255,
-    255,
-    80 * appear
-  );
-
-  ellipse(
-    -s * 0.12,
-    -s * 0.12,
-    s * 0.12
-  );
+  // No white dots or touch handles.
 
   pop();
 }
@@ -775,30 +867,33 @@ function drawDebug() {
     ? rotationY.toFixed(2)
     : "-";
 
-  text("rotationX " + x, 12, 12);
-  text("rotationY " + y, 12, 30);
+  // Position below Player 02 label.
+  const top = 100;
+
+  text("rotationX " + x, 24, top);
+  text("rotationY " + y, 24, top + 18);
 
   text(
     "finger " +
     (fingerHeld ? "down" : "up"),
-    12, 48
+    24, top + 36
   );
 
   text(
     "state " + scoopState,
-    12, 66
+    24, top + 54
   );
 
   text(
     "successful scoops " +
     totalScoops,
-    12, 84
+    24, top + 72
   );
 
   text(
     "floating fragments " +
     fragments.length,
-    12, 102
+    24, top + 90
   );
 
   textAlign(CENTER, CENTER);
@@ -816,14 +911,14 @@ function drawInstructions() {
   textAlign(CENTER, CENTER);
 
   text(
-    "Scoop to create · Tilt to guide · Shake to scatter",
+    "Scoop to create · Move to guide · Shake to scatter",
     width / 2,
     height - 35
   );
 }
 
 // ========================================
-// RESIZE
+// WINDOW RESIZE
 // ========================================
 
 function windowResized() {
