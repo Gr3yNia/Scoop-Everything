@@ -3,15 +3,19 @@
   SCOOP EVERYTHING — PLAYER 1 V2C
   Layered Kaleidoscopes / Scoop Memory
 
-  Every successful scoop:
+  Each successful scoop:
   - Adds a new independent kaleidoscope
   - New artwork fades in gently
   - Previous artworks fade one level
   - Old artworks never suddenly disappear
   - No fading happens simply because time passes
 
-  Preserves V2B continuous scoop detection
+  Preserves continuous scoop detection
   and research CSV recording.
+
+  LAYOUT UPDATE:
+  Debug information now appears below
+  the Player 01 title.
 */
 
 // ========================================
@@ -34,24 +38,13 @@ const SCOOP = {
 
 const ART = {
   background: [233, 234, 240],
-
   maxLayers: 24,
 
-  // Newest artwork stays fully visible.
   newestOpacity: 1,
-
-  // Oldest artwork is nearly invisible.
   oldestOpacity: 0.06,
-
-  // Takes 10 newer scoops to reach
-  // the minimum opacity.
   fadeLayers: 10,
 
-  // New artwork gently appears.
   appearMs: 650,
-
-  // Existing layers smoothly fade
-  // when another scoop is created.
   transitionMs: 850,
 
   minRadius: 0.12,
@@ -359,14 +352,12 @@ function addScoop() {
 
   const now = millis();
 
-  // Freeze the current opacity as the
+  // Freeze current opacity as the
   // starting point of each transition.
-  //
-  // This also works if the player scoops
-  // again before the previous fade ends.
 
   for (const k of kaleidoscopes) {
     k.opacityFrom = k.opacity;
+
     k.opacityTo = max(
       ART.oldestOpacity,
       k.opacityTo -
@@ -378,12 +369,10 @@ function addScoop() {
     k.transitionStartedAt = now;
   }
 
-  // Add a completely new artwork.
   const newArtwork = createKaleidoscope();
 
   kaleidoscopes.push(newArtwork);
 
-  // Limit rendering work on phones.
   if (
     kaleidoscopes.length >
     ART.maxLayers
@@ -478,8 +467,6 @@ function createKaleidoscope() {
       0.006, 0.014
     ),
 
-    // NEW OPACITY SYSTEM
-
     opacity: 0,
     opacityFrom: 0,
     opacityTo: ART.newestOpacity,
@@ -493,11 +480,8 @@ function createKaleidoscope() {
 // EASING FUNCTION
 // ========================================
 
-// Smooth start and finish for fading.
-
 function smoothFade(t) {
   t = constrain(t, 0, 1);
-
   return t * t * (3 - 2 * t);
 }
 
@@ -544,7 +528,6 @@ function drawAllKaleidoscopes() {
 
     const age = count - 1 - i;
 
-    // Old artwork moves more slowly.
     const ageProgress = constrain(
       age / ART.fadeLayers,
       0,
@@ -907,15 +890,24 @@ function mouseReleased() {
 }
 
 // ========================================
-// DEBUG READOUT
+// DEBUG READOUT — LAYOUT FIX
 // ========================================
 
 function drawDebugReadout() {
+  push();
+
   noStroke();
   fill(85, 92, 110);
 
   textSize(12);
   textAlign(LEFT, TOP);
+  textStyle(NORMAL);
+
+  // NEW POSITION:
+  // Below the Player 01 title.
+  const debugX = 24;
+  const debugY = 105;
+  const lineHeight = 19;
 
   const xText =
     Number.isFinite(rotationX)
@@ -929,12 +921,14 @@ function drawDebugReadout() {
 
   text(
     "rotationX " + xText,
-    12, 12
+    debugX,
+    debugY
   );
 
   text(
     "rotationY " + yText,
-    12, 30
+    debugX,
+    debugY + lineHeight
   );
 
   text(
@@ -946,27 +940,31 @@ function drawDebugReadout() {
         ? "-"
         : trackedFingerId
     ),
-    12, 48
+    debugX,
+    debugY + lineHeight * 2
   );
 
   text(
     "state " + scoopState,
-    12, 66
+    debugX,
+    debugY + lineHeight * 3
   );
 
   text(
     "successful scoops " +
     totalScoops,
-    12, 84
+    debugX,
+    debugY + lineHeight * 4
   );
 
   text(
     "visible layers " +
     kaleidoscopes.length,
-    12, 102
+    debugX,
+    debugY + lineHeight * 5
   );
 
-  textAlign(CENTER, CENTER);
+  pop();
 }
 
 // ========================================
