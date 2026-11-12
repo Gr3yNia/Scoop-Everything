@@ -3,9 +3,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1.0"
+>
 
-<title>Scoop Everything — Shared Display</title>
+<title>Scoop Everything — Shared Display V2C</title>
 
 <script src="https://cdn.jsdelivr.net/npm/p5@2.2.3/lib/p5.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/p5.js-compatibility@0.2.0/src/preload.js"></script>
@@ -16,14 +19,16 @@
 :root {
   --ink: #343B4D;
   --muted: #777E90;
-  --line: rgba(52,59,77,.17);
+  --line: rgba(52,59,77,.15);
+  --paper: #E9EAF0;
 }
 
 * {
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   width: 100%;
   height: 100%;
@@ -31,9 +36,18 @@ html, body {
 }
 
 body {
-  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-family:
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+
   color: var(--ink);
-  background: #E9EAF0;
+  background: var(--paper);
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
 }
 
 .screen {
@@ -60,9 +74,13 @@ body {
     );
 }
 
+/* ======================================
+   LANDING PAGE
+====================================== */
+
 .nav {
   position: absolute;
-  top: 38px;
+  top: 30px;
   right: 5%;
   z-index: 10;
 }
@@ -76,9 +94,12 @@ body {
 .welcome {
   position: absolute;
   inset: 0;
+
   display: flex;
   align-items: center;
+
   padding: 7%;
+
   z-index: 5;
 
   transition:
@@ -88,7 +109,7 @@ body {
 }
 
 .intro {
-  width: 48%;
+  width: 46%;
   position: relative;
   z-index: 2;
 }
@@ -101,7 +122,9 @@ body {
 }
 
 h1 {
-  font-size: clamp(58px,7.5vw,128px);
+  font-size:
+    clamp(58px,7.5vw,128px);
+
   font-weight: 200;
   letter-spacing: -.065em;
   line-height: .95;
@@ -116,7 +139,8 @@ h1 {
 
 .detail {
   padding-left: 16px;
-  border-left: 1px solid var(--line);
+  border-left:
+    1px solid var(--line);
 }
 
 .detail strong {
@@ -131,18 +155,16 @@ h1 {
   font-size: 11px;
 }
 
-button {
-  font: inherit;
-  cursor: pointer;
-}
-
 .start {
-  margin-top: 48px;
+  margin-top: 42px;
   padding: 19px 34px;
+
   border: none;
   border-radius: 100px;
+
   color: white;
   background: var(--ink);
+
   font-size: 13px;
 
   transition:
@@ -160,55 +182,73 @@ button {
   font-size: 18px;
 }
 
-/* Animated pastel circle — bottom right */
+.start:disabled {
+  opacity: .6;
+  cursor: default;
+}
+
+.start:disabled:hover {
+  transform: none;
+}
 
 #preview {
   position: absolute;
+
   width: min(65vw,900px);
   height: min(65vw,900px);
+
   right: -34%;
   bottom: -48%;
-  top: auto;
-  transform: none;
+
   pointer-events: none;
   opacity: .95;
 }
 
-/* CREATE and DISRUPT QR codes */
+/* ======================================
+   QR CODES
+====================================== */
 
 .qr-layer {
   position: absolute;
-  top: 55%;
-  transform: translateY(-50%);
+
+  top: 45%;
   right: 5%;
+
+  transform:
+    translateY(-50%);
+
   width: 48%;
+
   z-index: 8;
 
   display: flex;
   justify-content: center;
-  gap: clamp(28px, 5vw, 90px);
   align-items: flex-start;
 
-  pointer-events: none;
+  gap:
+    clamp(28px,5vw,90px);
 }
 
 .qr-player {
   display: flex;
   flex-direction: column;
   align-items: center;
+
   gap: 8px;
   width: 155px;
+
   text-align: center;
-  pointer-events: auto;
 }
 
 .qr-frame {
   padding: 13px;
+
   background: #FFFFFF;
   border-radius: 10px;
 
   box-shadow:
-    0 8px 35px rgba(52,59,77,.09);
+    0 8px 35px
+    rgba(52,59,77,.09);
 }
 
 .qr-code {
@@ -219,6 +259,7 @@ button {
 .qr-code img,
 .qr-code canvas {
   display: block;
+
   width: 118px !important;
   height: 118px !important;
 }
@@ -236,31 +277,127 @@ button {
 
 .qr-heading {
   position: absolute;
-  top: -83px;
+
+  top: -70px;
   left: 0;
+
   width: 100%;
+
   text-align: center;
+
   color: #737A8C;
+
   font-size: 11px;
   letter-spacing: .13em;
   line-height: 1.5;
 }
 
+/* ======================================
+   TWO INSTRUCTION BOXES
+====================================== */
+
+.instructions {
+  position: absolute;
+
+  bottom: 68px;
+  right: 5%;
+
+  width: 48%;
+  z-index: 9;
+
+  display: grid;
+  grid-template-columns:
+    repeat(2,minmax(0,1fr));
+
+  gap: 12px;
+}
+
+.instruction-box {
+  padding: 18px 20px;
+
+  background:
+    rgba(255,255,255,.65);
+
+  border:
+    1px solid rgba(255,255,255,.75);
+
+  border-radius: 15px;
+
+  backdrop-filter: blur(8px);
+}
+
+.instruction-title {
+  font-size: 12px;
+  letter-spacing: .13em;
+
+  margin-bottom: 10px;
+}
+
+.instruction-box p {
+  font-size: 11px;
+  line-height: 1.65;
+
+  color: #73798A;
+
+  margin: 0;
+}
+
+.instruction-box p + p {
+  margin-top: 7px;
+}
+
+.instruction-box b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.challenge-note {
+  grid-column: 1 / -1;
+
+  font-size: 11px;
+  line-height: 1.6;
+
+  text-align: center;
+  color: #777E90;
+
+  padding: 4px 12px;
+}
+
+.challenge-note strong {
+  color: var(--ink);
+}
+
+.lobby-status {
+  grid-column: 1 / -1;
+
+  text-align: center;
+  font-size: 11px;
+
+  color: #74798A;
+  min-height: 16px;
+}
+
 .footer {
   position: absolute;
-  bottom: 30px;
+
+  bottom: 26px;
   left: 5%;
+
   font-size: 10px;
   letter-spacing: .16em;
+
   color: #959AAA;
   z-index: 10;
 }
 
-/* Exhibition mode */
+/* ======================================
+   EXHIBITION
+====================================== */
 
 .exhibition {
   position: absolute;
   inset: 0;
+
   opacity: 0;
   visibility: hidden;
 
@@ -277,34 +414,110 @@ button {
 
 .exhibition-label {
   position: absolute;
+
   top: 36px;
   left: 5%;
+
   color: #73798A;
+
   font-size: 11px;
   letter-spacing: .22em;
+
   pointer-events: none;
 }
 
 .status {
   position: absolute;
+
   top: 65px;
   left: 5%;
+
   color: #818696;
   font-size: 12px;
+
   pointer-events: none;
+}
+
+.game-timer {
+  position: absolute;
+
+  top: 34px;
+  left: 50%;
+
+  transform: translateX(-50%);
+
+  font-size: 38px;
+  font-weight: 200;
+
+  letter-spacing: -.04em;
+
+  color: var(--ink);
+
+  pointer-events: none;
+}
+
+.recovery-message {
+  position: absolute;
+
+  top: 50%;
+  left: 50%;
+
+  transform:
+    translate(-50%,-50%);
+
+  text-align: center;
+
+  display: none;
+  pointer-events: none;
+
+  z-index: 30;
+}
+
+.recovery-number {
+  font-size:
+    clamp(80px,13vw,180px);
+
+  font-weight: 200;
+  line-height: 1;
+
+  color: #B77C78;
+}
+
+.recovery-text {
+  margin-top: 15px;
+
+  font-size: 15px;
+  color: #74798A;
+}
+
+.recovery-subtext {
+  margin-top: 8px;
+
+  font-size: 12px;
+  color: #858B9B;
 }
 
 .reset {
   position: absolute;
+
   right: 30px;
   bottom: 25px;
+
   padding: 11px 20px;
-  border: 1px solid var(--line);
+
+  border:
+    1px solid var(--line);
+
   border-radius: 100px;
-  background: rgba(255,255,255,.5);
+
+  background:
+    rgba(255,255,255,.5);
+
   color: var(--ink);
   font-size: 11px;
-  opacity: .3;
+
+  opacity: .35;
+
   transition: opacity .3s;
 }
 
@@ -313,20 +526,140 @@ button {
   opacity: 1;
 }
 
-body.playing .welcome {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transform: translateY(-20px);
+/* ======================================
+   COUNTDOWN
+====================================== */
+
+.countdown-overlay {
+  position: absolute;
+  inset: 0;
+
+  z-index: 40;
+
+  display: none;
+  align-items: center;
+  justify-content: center;
+
+  flex-direction: column;
+
+  background:
+    rgba(233,234,240,.75);
+
+  backdrop-filter: blur(4px);
 }
 
+.countdown-number {
+  font-size:
+    clamp(120px,20vw,270px);
+
+  font-weight: 200;
+  line-height: 1;
+}
+
+.countdown-caption {
+  margin-top: 18px;
+
+  font-size: 13px;
+  letter-spacing: .15em;
+
+  color: #74798A;
+}
+
+/* ======================================
+   WINNER SCREEN
+====================================== */
+
+.end-overlay {
+  position: absolute;
+  inset: 0;
+
+  z-index: 60;
+
+  display: none;
+
+  align-items: center;
+  justify-content: center;
+
+  padding: 30px;
+
+  background:
+    rgba(233,234,240,.94);
+
+  backdrop-filter: blur(12px);
+
+  text-align: center;
+}
+
+.end-content {
+  max-width: 650px;
+}
+
+.end-eyebrow {
+  font-size: 11px;
+  letter-spacing: .25em;
+
+  color: #858B9B;
+  margin-bottom: 35px;
+}
+
+.end-symbol {
+  font-size: 62px;
+  color: #B7A8C8;
+
+  margin-bottom: 25px;
+}
+
+.end-title {
+  font-size:
+    clamp(44px,6vw,90px);
+
+  font-weight: 200;
+  letter-spacing: -.055em;
+
+  line-height: 1.05;
+}
+
+.end-subtitle {
+  margin-top: 25px;
+
+  font-size: 16px;
+  line-height: 1.7;
+
+  color: #74798A;
+}
+
+.play-again {
+  margin-top: 42px;
+
+  padding: 16px 35px;
+
+  border: none;
+  border-radius: 100px;
+
+  background: var(--ink);
+  color: white;
+
+  font-size: 13px;
+}
+
+/* ======================================
+   STATES
+====================================== */
+
+body.playing .welcome,
 body.playing .nav,
 body.playing .footer,
 body.playing #preview,
-body.playing .qr-layer {
+body.playing .qr-layer,
+body.playing .instructions {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
+}
+
+body.playing .welcome {
+  transform:
+    translateY(-20px);
 }
 
 body.playing .exhibition {
@@ -334,35 +667,55 @@ body.playing .exhibition {
   visibility: visible;
 }
 
-/* Smaller screens */
+/* ======================================
+   RESPONSIVE
+====================================== */
 
-@media (max-width: 900px) {
-  .qr-layer {
-    top: 55%;
-    right: 3%;
-    width: 49%;
-    gap: 22px;
+@media (max-width: 1000px) {
+  .intro {
+    width: 45%;
   }
 
-  .qr-player {
-    width: 125px;
+  h1 {
+    font-size:
+      clamp(52px,7vw,90px);
   }
 
-  .qr-frame {
-    padding: 9px;
+  .instructions {
+    bottom: 55px;
   }
 
-  .qr-code,
-  .qr-code img,
-  .qr-code canvas {
-    width: 96px !important;
-    height: 96px !important;
+  .instruction-box {
+    padding: 13px;
+  }
+
+  .instruction-box p {
+    font-size: 10px;
   }
 }
 
 @media (max-width: 750px) {
+  html,
+  body {
+    overflow: auto;
+  }
+
+  .screen {
+    min-height: 100dvh;
+    height: auto;
+    overflow: visible;
+
+    padding-bottom: 25px;
+  }
+
   .welcome {
-    padding: 8%;
+    position: relative;
+    inset: auto;
+
+    display: block;
+
+    padding:
+      75px 8% 20px;
   }
 
   .intro {
@@ -375,54 +728,109 @@ body.playing .exhibition {
 
   .details {
     gap: 20px;
+    margin-top: 30px;
+  }
+
+  .start {
+    margin-top: 25px;
   }
 
   #preview {
     width: 100vw;
     height: 100vw;
+
     right: -38%;
-    bottom: -42%;
-    top: auto;
-    opacity: .35;
+    bottom: auto;
+    top: 120px;
+
+    opacity: .3;
   }
 
   .qr-layer {
-    top: 55%;
-    right: 5%;
-    width: 90%;
-    justify-content: center;
-    gap: 24px;
+    position: relative;
+
+    top: auto;
+    right: auto;
+
+    transform: none;
+
+    width: 100%;
+
+    margin-top: 75px;
+
+    gap: 28px;
   }
 
   .qr-player {
-    width: 110px;
+    width: 125px;
   }
 
   .qr-heading {
-    top: -65px;
+    top: -50px;
     font-size: 9px;
-    letter-spacing: .08em;
   }
 
-  .qr-code,
-  .qr-code img,
-  .qr-code canvas {
-    width: 86px !important;
-    height: 86px !important;
+  .instructions {
+    position: relative;
+
+    right: auto;
+    bottom: auto;
+
+    width: 90%;
+
+    margin:
+      30px auto 45px;
+  }
+
+  .footer {
+    bottom: 15px;
+  }
+
+  body.playing .screen {
+    height: 100dvh;
+    min-height: 100dvh;
+
+    overflow: hidden;
+  }
+
+  .exhibition {
+    position: absolute;
+    inset: 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    transition-duration: 0s !important;
+  *,
+  *::before,
+  *::after {
+    transition-duration:
+      0s !important;
   }
 }
+
+/* V2C — WIDER QR CODE SPACING */
+
+.qr-layer {
+  justify-content: space-between;
+  gap: 24px;
+}
+
+@media (max-width: 750px) {
+  .qr-layer {
+    padding: 0 8%;
+    justify-content: space-between;
+    gap: 20px;
+  }
+}
+
 </style>
 </head>
 
 <body>
 
 <div class="screen">
+
+  <!-- LANDING PAGE -->
 
   <header class="nav">
     <div class="nav-label">
@@ -431,15 +839,20 @@ body.playing .exhibition {
   </header>
 
   <section class="welcome">
+
     <div class="intro">
 
       <div class="eyebrow">
         COLLECTIVE GENERATIVE ART
       </div>
 
-      <h1>Scoop<br>Everything</h1>
+      <h1>
+        Scoop<br>
+        Everything
+      </h1>
 
       <div class="details">
+
         <div class="detail">
           <strong>2+ Participants</strong>
           <span>Mobile interaction</span>
@@ -449,42 +862,132 @@ body.playing .exhibition {
           <strong>Shared Display</strong>
           <span>Real-time generative art</span>
         </div>
+
       </div>
 
-      <button class="start" id="startButton">
-        Play Together <span>↗</span>
+      <button
+        class="start"
+        id="startButton"
+      >
+        Play Together
+        <span>↗</span>
       </button>
 
     </div>
+
   </section>
 
   <canvas id="preview"></canvas>
 
-  <!-- CREATE and DISRUPT QR codes -->
+  <!-- QR CODES -->
 
   <div class="qr-layer">
 
     <div class="qr-heading">
-      CHOOSE HOW YOU WANT TO PLAY WITH THE ARTWORK
+      CHOOSE HOW YOU WANT TO PLAY
+      WITH THE ARTWORK
     </div>
 
     <div class="qr-player">
+
       <div class="qr-frame">
-        <div class="qr-code" id="qrCreate"></div>
+        <div
+          class="qr-code"
+          id="qrCreate"
+        ></div>
       </div>
+
       <strong>CREATE</strong>
       <span>Scoop to build</span>
+
     </div>
 
     <div class="qr-player">
+
       <div class="qr-frame">
-        <div class="qr-code" id="qrDisrupt"></div>
+        <div
+          class="qr-code"
+          id="qrDisrupt"
+        ></div>
       </div>
+
       <strong>DISRUPT</strong>
       <span>Move to erase</span>
+
     </div>
 
   </div>
+
+  <!-- TWO INSTRUCTION BOXES -->
+
+  <div class="instructions">
+
+    <div class="instruction-box">
+
+      <div class="instruction-title">
+        CREATE
+      </div>
+
+      <p>
+        Hold your finger and scoop
+        to create artwork.
+      </p>
+
+      <p>
+        Keep creating as DISRUPT
+        erases your art.
+      </p>
+
+      <p>
+        If no artworks remain,
+        you have <b>5 seconds</b>
+        to create another!
+      </p>
+
+    </div>
+
+    <div class="instruction-box">
+
+      <div class="instruction-title">
+        DISRUPT
+      </div>
+
+      <p>
+        Hold your finger and scoop
+        to release glass fragments.
+      </p>
+
+      <p>
+        Tilt your phone to hit
+        and erase artworks.
+      </p>
+
+      <p>
+        Each fragment disappears
+        after <b>5 seconds</b>.
+        Stop CREATE from recovering!
+      </p>
+
+    </div>
+
+    <div class="challenge-note">
+      <strong>30-second challenge:</strong>
+      CREATE wins if artwork survives.
+      DISRUPT wins if CREATE fails
+      to make new artwork within
+      the 5-second recovery period.
+    </div>
+
+    <div
+      class="lobby-status"
+      id="lobbyStatus"
+    >
+      Scan a QR code to join.
+    </div>
+
+  </div>
+
+  <!-- LIVE EXHIBITION -->
 
   <section class="exhibition">
 
@@ -494,81 +997,325 @@ body.playing .exhibition {
       SCOOP EVERYTHING / LIVE CANVAS
     </div>
 
-    <div class="status" id="connectionStatus">
+    <div
+      class="status"
+      id="connectionStatus"
+    >
       Waiting for connection
     </div>
 
-    <button class="reset" id="resetButton">
+    <div
+      class="game-timer"
+      id="gameTimer"
+    >
+      00:30
+    </div>
+
+    <!-- RECOVERY COUNTDOWN -->
+
+    <div
+      class="recovery-message"
+      id="recoveryMessage"
+    >
+
+      <div
+        class="recovery-number"
+        id="recoveryNumber"
+      >
+        5
+      </div>
+
+      <div class="recovery-text">
+        No artworks remain!
+      </div>
+
+      <div class="recovery-subtext">
+        CREATE has 5 seconds
+        to make another.
+      </div>
+
+    </div>
+
+    <button
+      class="reset"
+      id="resetButton"
+    >
       Reset Session
     </button>
 
   </section>
 
+  <!-- MAIN COUNTDOWN -->
+
+  <div
+    class="countdown-overlay"
+    id="countdownOverlay"
+  >
+
+    <div
+      class="countdown-number"
+      id="countdownNumber"
+    >
+      3
+    </div>
+
+    <div class="countdown-caption">
+      GET READY
+    </div>
+
+  </div>
+
+  <!-- WINNER SCREEN -->
+
+  <div
+    class="end-overlay"
+    id="endOverlay"
+  >
+
+    <div class="end-content">
+
+      <div class="end-eyebrow">
+        ROUND COMPLETE
+      </div>
+
+      <div
+        class="end-symbol"
+        id="endSymbol"
+      >
+        ✦
+      </div>
+
+      <div
+        class="end-title"
+        id="endTitle"
+      >
+        Creation Prevails
+      </div>
+
+      <div
+        class="end-subtitle"
+        id="endSubtitle"
+      >
+        Creation is vulnerable,
+        but creativity is continuous.
+      </div>
+
+      <button
+        class="play-again"
+        id="playAgainButton"
+      >
+        Play Again
+      </button>
+
+    </div>
+
+  </div>
+
   <div class="footer">
-    SCOOP EVERYTHING / COLLECTIVE EXPERIENCE
+    SCOOP EVERYTHING /
+    COLLECTIVE EXPERIENCE
   </div>
 
 </div>
 
 <script>
-// =======================================
+/*
+  SCOOP EVERYTHING — DISPLAY V2C
+
+  This display is the authority for:
+  - Player readiness
+  - Countdown
+  - Round timer
+  - Artwork collisions
+  - Artwork removal
+  - CREATE recovery countdown
+  - Winner selection
+  - Replay
+
+  Required CREATE events:
+    player-ready
+    scoop
+
+  Required DISRUPT events:
+    player-ready
+    disrupt
+
+  Display broadcasts:
+    game-countdown
+    game-start
+    game-state
+    artwork-erased
+    fragment-hit
+    game-over
+    game-reset
+*/
+
+// ========================================
 // NETWORK
-// =======================================
+// ========================================
 
 const SHARE_HOST =
   "https://p5-phone-share.npuckett.workers.dev";
 
-const SHARE_ROOM = "scoop-everything-v2c";
-const SHARE_APP = "scoop-everything";
+const SHARE_ROOM =
+  "scoop-everything-v2c";
 
-// CREATE page
+const SHARE_APP =
+  "scoop-everything";
+
 const CREATE_URL =
   "https://gr3ynia.github.io/Scoop-Everything/create.html";
 
-// DISRUPT page
 const DISRUPT_URL =
   "https://gr3ynia.github.io/Scoop-Everything/disrupt.html";
 
-// =======================================
-// REAL QR CODES
-// =======================================
+// ========================================
+// GAME SETTINGS
+// ========================================
+
+const GAME = {
+  roundMs: 30000,
+  recoveryMs: 5000,
+  countdownMs: 3000,
+
+  stateSendMs: 250,
+
+  spawnProtectionMs: 1000,
+
+  maxArtworks: 24
+};
+
+const MAX_LAYERS = 24;
+const FADE_LAYERS = 10;
+const OLDEST_OPACITY = 0.06;
+
+// ========================================
+// QR CODES
+// ========================================
 
 function createQR(elementId, url) {
-  if (typeof QRCode === "undefined") {
-    document.getElementById(elementId).textContent =
+  const target =
+    document.getElementById(
+      elementId
+    );
+
+  if (
+    typeof QRCode === "undefined"
+  ) {
+    target.textContent =
       "QR unavailable";
+
     return;
   }
 
-  new QRCode(
-    document.getElementById(elementId),
-    {
-      text: url,
-      width: 118,
-      height: 118,
-      colorDark: "#343B4D",
-      colorLight: "#FFFFFF",
-      correctLevel: QRCode.CorrectLevel.M
-    }
-  );
+  new QRCode(target, {
+    text: url,
+    width: 118,
+    height: 118,
+
+    colorDark: "#343B4D",
+    colorLight: "#FFFFFF",
+
+    correctLevel:
+      QRCode.CorrectLevel.M
+  });
 }
 
-// Updated QR code names and destinations
-createQR("qrCreate", CREATE_URL);
-createQR("qrDisrupt", DISRUPT_URL);
+createQR(
+  "qrCreate",
+  CREATE_URL
+);
 
-// =======================================
-// ORIGINAL CANVASES
-// =======================================
+createQR(
+  "qrDisrupt",
+  DISRUPT_URL
+);
 
-const preview = document.getElementById("preview");
-const pctx = preview.getContext("2d");
+// ========================================
+// DOM REFERENCES
+// ========================================
 
-const shared = document.getElementById("sharedCanvas");
-const sctx = shared.getContext("2d");
+const preview =
+  document.getElementById(
+    "preview"
+  );
+
+const pctx =
+  preview.getContext("2d");
+
+const shared =
+  document.getElementById(
+    "sharedCanvas"
+  );
+
+const sctx =
+  shared.getContext("2d");
 
 const statusElement =
-  document.getElementById("connectionStatus");
+  document.getElementById(
+    "connectionStatus"
+  );
+
+const lobbyStatus =
+  document.getElementById(
+    "lobbyStatus"
+  );
+
+const startButton =
+  document.getElementById(
+    "startButton"
+  );
+
+const timerElement =
+  document.getElementById(
+    "gameTimer"
+  );
+
+const recoveryMessage =
+  document.getElementById(
+    "recoveryMessage"
+  );
+
+const recoveryNumber =
+  document.getElementById(
+    "recoveryNumber"
+  );
+
+const countdownOverlay =
+  document.getElementById(
+    "countdownOverlay"
+  );
+
+const countdownNumber =
+  document.getElementById(
+    "countdownNumber"
+  );
+
+const endOverlay =
+  document.getElementById(
+    "endOverlay"
+  );
+
+const endTitle =
+  document.getElementById(
+    "endTitle"
+  );
+
+const endSubtitle =
+  document.getElementById(
+    "endSubtitle"
+  );
+
+const endSymbol =
+  document.getElementById(
+    "endSymbol"
+  );
+
+// ========================================
+// GLOBAL STATE
+// ========================================
+
+let particles = [];
 
 const colors = [
   "#D9A7A0",
@@ -578,20 +1325,47 @@ const colors = [
   "#FFFFFF"
 ];
 
-let particles = [];
 let sharedArtworks = [];
-let playing = false;
 
-const MAX_LAYERS = 24;
-const FADE_LAYERS = 10;
-const OLDEST_OPACITY = .06;
+const disruptPlayers =
+  new Map();
 
-// =======================================
-// P5 SHARE
-// =======================================
+const spentFragments =
+  new Set();
+
+const readyPlayers =
+  new Map();
+
+let nextArtworkId = 1;
+
+let totalHits = 0;
+
+let gamePhase = "lobby";
+
+let gameArmed = false;
+
+let roundId = null;
+
+let countdownEndsAt = 0;
+let roundEndsAt = 0;
+let recoveryEndsAt = 0;
+
+let gameWinner = null;
+
+let lastStateSentAt = 0;
+
+let lastCountdownShown = null;
+
+let recoveryStarted = false;
+
+// ========================================
+// P5 SHARE SETUP
+// ========================================
 
 function setup() {
-  const helper = createCanvas(1, 1);
+  const helper =
+    createCanvas(1, 1);
+
   helper.hide();
   noLoop();
 
@@ -599,25 +1373,334 @@ function setup() {
     host: SHARE_HOST,
     room: SHARE_ROOM,
     app: SHARE_APP,
+
     me: {
       name: "Shared Display",
       role: "display"
     }
   });
-
-  // Connection status is shown in exhibition mode.
 }
 
-// =======================================
-// RECEIVE PHONE EVENTS
-// =======================================
+// ========================================
+// SHARE HELPERS
+// ========================================
 
-function shareEvent(name, data, from) {
-  if (name !== "scoop") return;
-  if (!data || data.player !== 1) return;
-  if (!data.artwork) return;
+function isConnected() {
+  return (
+    typeof shareConnected !==
+      "undefined" &&
+    shareConnected
+  );
+}
 
-  const a = data.artwork;
+function emitGame(name, data) {
+  if (
+    !isConnected() ||
+    typeof shareEmit !==
+      "function"
+  ) {
+    return;
+  }
+
+  shareEmit(name, data);
+}
+
+// ========================================
+// READY PLAYERS
+// ========================================
+
+function receiveReady(data) {
+  if (
+    gamePhase !== "lobby"
+  ) {
+    return;
+  }
+
+  const id =
+    data.participantId;
+
+  const role =
+    data.mode;
+
+  if (
+    typeof id !== "string" ||
+    !id
+  ) {
+    return;
+  }
+
+  if (
+    role !== "create" &&
+    role !== "disrupt"
+  ) {
+    return;
+  }
+
+  readyPlayers.set(id, {
+    id,
+    role,
+    ready: data.ready === true,
+    lastSeen: Date.now()
+  });
+
+  updateLobbyStatus();
+  tryStartCountdown();
+}
+
+function countReady(role) {
+  let count = 0;
+
+  for (
+    const player of
+    readyPlayers.values()
+  ) {
+    if (
+      player.role === role &&
+      player.ready
+    ) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+function updateLobbyStatus() {
+  const createCount =
+    countReady("create");
+
+  const disruptCount =
+    countReady("disrupt");
+
+  lobbyStatus.textContent =
+    "CREATE ready: " +
+    createCount +
+    " · DISRUPT ready: " +
+    disruptCount;
+
+  if (!gameArmed) {
+    startButton.disabled = false;
+
+    startButton.innerHTML =
+      'Play Together <span>↗</span>';
+
+  } else {
+    startButton.disabled = true;
+
+    startButton.innerHTML =
+      'Waiting for Players <span>···</span>';
+  }
+}
+
+function tryStartCountdown() {
+  if (!gameArmed) {
+    return;
+  }
+
+  if (
+    gamePhase !== "lobby"
+  ) {
+    return;
+  }
+
+  if (
+    countReady("create") < 1 ||
+    countReady("disrupt") < 1
+  ) {
+    return;
+  }
+
+  startCountdown();
+}
+
+// ========================================
+// GAME COUNTDOWN
+// ========================================
+
+function startCountdown() {
+  gamePhase = "countdown";
+
+  roundId =
+    "round-" +
+    Date.now() +
+    "-" +
+    Math.random()
+      .toString(36)
+      .slice(2, 7);
+
+  clearRoundArtwork();
+
+  countdownEndsAt =
+    Date.now() +
+    GAME.countdownMs;
+
+  lastCountdownShown = null;
+
+  document.body.classList.add(
+    "playing"
+  );
+
+  countdownOverlay.style.display =
+    "flex";
+
+  endOverlay.style.display =
+    "none";
+
+  recoveryMessage.style.display =
+    "none";
+
+  resizeAll();
+
+  emitGame("game-countdown", {
+    roundId,
+    countdownMs:
+      GAME.countdownMs
+  });
+}
+
+// ========================================
+// GAME START
+// ========================================
+
+function startRound() {
+  gamePhase = "playing";
+
+  const now =
+    Date.now();
+
+  roundEndsAt =
+    now + GAME.roundMs;
+
+  // CREATE gets 5 seconds to
+  // produce the first artwork.
+  recoveryEndsAt =
+    now + GAME.recoveryMs;
+
+  recoveryStarted = true;
+
+  countdownOverlay.style.display =
+    "none";
+
+  clearRoundArtwork();
+
+  emitGame("game-start", {
+    roundId,
+    remainingMs:
+      GAME.roundMs,
+
+    recoveryRemainingMs:
+      GAME.recoveryMs
+  });
+
+  sendGameState();
+}
+
+// ========================================
+// ROUND STATE
+// ========================================
+
+function sendGameState() {
+  if (
+    gamePhase !== "playing"
+  ) {
+    return;
+  }
+
+  const now = Date.now();
+
+  emitGame("game-state", {
+    roundId,
+
+    phase: "playing",
+
+    remainingMs:
+      Math.max(
+        0,
+        roundEndsAt - now
+      ),
+
+    recoveryRemainingMs:
+      recoveryEndsAt > 0
+        ? Math.max(
+            0,
+            recoveryEndsAt - now
+          )
+        : 0,
+
+    artworkCount:
+      sharedArtworks.length,
+
+    fragmentCount:
+      countActiveFragments(
+        performance.now()
+      )
+  });
+
+  lastStateSentAt = now;
+}
+
+// ========================================
+// RECEIVE NETWORK EVENTS
+// ========================================
+
+function shareEvent(
+  name,
+  data,
+  from
+) {
+  if (!data) {
+    return;
+  }
+
+  if (
+    name === "player-ready"
+  ) {
+    receiveReady(data);
+    return;
+  }
+
+  if (
+    name === "scoop"
+  ) {
+    receiveCreate(data);
+    return;
+  }
+
+  if (
+    name === "disrupt"
+  ) {
+    receiveDisrupt(data);
+    return;
+  }
+}
+
+// ========================================
+// RECEIVE CREATE
+// ========================================
+
+function receiveCreate(data) {
+  if (
+    gamePhase !== "playing"
+  ) {
+    return;
+  }
+
+  if (
+    data.player !== 1 ||
+    !data.artwork
+  ) {
+    return;
+  }
+
+  if (
+    data.roundId != null &&
+    data.roundId !== roundId
+  ) {
+    return;
+  }
+
+  const a =
+    data.artwork;
 
   if (
     !Number.isFinite(a.x) ||
@@ -629,163 +1712,1141 @@ function shareEvent(name, data, from) {
     return;
   }
 
-  addSharedArtwork(a);
+  addSharedArtwork(
+    a,
+    data.participantId ||
+      "create-default"
+  );
+
+  // A successful new artwork
+  // cancels recovery.
+  recoveryEndsAt = 0;
+
+  recoveryStarted = false;
+
+  recoveryMessage.style.display =
+    "none";
+
+  sendGameState();
 }
 
-function addSharedArtwork(a) {
-  const now = performance.now();
+// ========================================
+// CREATE ARTWORK STORAGE
+// ========================================
 
-  for (const k of sharedArtworks) {
-    k.opacityFrom = getOpacity(k, now);
+function addSharedArtwork(
+  a,
+  participantId
+) {
+  const now =
+    performance.now();
+
+  for (
+    const k of sharedArtworks
+  ) {
+    k.opacityFrom =
+      getOpacity(k, now);
+
     k.opacityTo = Math.max(
       OLDEST_OPACITY,
+
       k.opacityTo -
-      (1 - OLDEST_OPACITY) / FADE_LAYERS
+      (
+        1 - OLDEST_OPACITY
+      ) / FADE_LAYERS
     );
-    k.transitionStartedAt = now;
+
+    k.transitionStartedAt =
+      now;
   }
 
-  sharedArtworks.push({
+  const artworkId =
+    a.artworkId ||
+    a.id ||
+    (
+      "art-" +
+      nextArtworkId++
+    );
+
+  // A creator can send a unique
+  // artworkId so that the same
+  // artwork can be erased on
+  // their own phone.
+  const artwork = {
     ...a,
+
+    artworkId,
+    participantId,
+
     opacityFrom: 0,
     opacityTo: 1,
-    transitionStartedAt: now,
-    rotationNow: a.rotation,
-    createdAt: now
-  });
 
-  if (sharedArtworks.length > MAX_LAYERS) {
-    sharedArtworks.shift();
+    transitionStartedAt:
+      now,
+
+    rotationNow:
+      Number.isFinite(
+        a.rotation
+      )
+        ? a.rotation
+        : 0,
+
+    createdAt: now,
+
+    // Independent circular orbit
+    // around the initial position.
+    orbitRadius:
+      Number.isFinite(
+        a.orbitRadius
+      )
+        ? a.orbitRadius
+        : 0.025 +
+          Math.random() * 0.065,
+
+    orbitSpeed:
+      Number.isFinite(
+        a.orbitSpeed
+      )
+        ? a.orbitSpeed
+        : 0.00025 +
+          Math.random() * 0.00065,
+
+    orbitPhase:
+      Number.isFinite(
+        a.orbitPhase
+      )
+        ? a.orbitPhase
+        : Math.random() *
+          Math.PI * 2,
+
+    orbitDirection:
+      Number.isFinite(
+        a.orbitDirection
+      )
+        ? a.orbitDirection
+        : Math.random() < .5
+          ? -1
+          : 1
+  };
+
+  sharedArtworks.push(
+    artwork
+  );
+
+  while (
+    sharedArtworks.length >
+    MAX_LAYERS
+  ) {
+    const removed =
+      sharedArtworks.shift();
+
+    notifyArtworkRemoved(
+      removed,
+      "layer-limit"
+    );
   }
 }
 
+// ========================================
+// OPACITY
+// ========================================
+
 function smoothFade(t) {
-  const x = Math.max(0, Math.min(1, t));
-  return x * x * (3 - 2 * x);
+  const x = Math.max(
+    0,
+    Math.min(1, t)
+  );
+
+  return (
+    x * x *
+    (3 - 2 * x)
+  );
 }
 
 function getOpacity(k, now) {
   const duration =
-    k.opacityFrom === 0 && k.opacityTo === 1
+    k.opacityFrom === 0 &&
+    k.opacityTo === 1
       ? 650
       : 850;
 
-  const progress = smoothFade(
-    (now - k.transitionStartedAt) / duration
-  );
+  const progress =
+    smoothFade(
+      (
+        now -
+        k.transitionStartedAt
+      ) / duration
+    );
 
   return (
     k.opacityFrom +
-    (k.opacityTo - k.opacityFrom) * progress
+    (
+      k.opacityTo -
+      k.opacityFrom
+    ) * progress
   );
 }
 
-// =======================================
+// ========================================
+// CIRCULAR ARTWORK MOVEMENT
+// ========================================
+
+function getArtworkPosition(
+  k,
+  w,
+  h,
+  time
+) {
+  const angle =
+    (
+      time -
+      k.createdAt
+    ) *
+    k.orbitSpeed *
+    k.orbitDirection +
+    k.orbitPhase;
+
+  const orbitRadius =
+    k.orbitRadius *
+    Math.min(w, h);
+
+  return {
+    x:
+      k.x * w +
+      Math.cos(angle) *
+      orbitRadius,
+
+    y:
+      k.y * h +
+      Math.sin(angle) *
+      orbitRadius
+  };
+}
+
+// ========================================
+// RECEIVE DISRUPT
+// ========================================
+
+function fragmentKey(
+  participantId,
+  id
+) {
+  return (
+    participantId +
+    ":" +
+    id
+  );
+}
+
+function receiveDisrupt(data) {
+  if (
+    gamePhase !== "playing"
+  ) {
+    return;
+  }
+
+  if (
+    data.player !== 2
+  ) {
+    return;
+  }
+
+  if (
+    data.roundId != null &&
+    data.roundId !== roundId
+  ) {
+    return;
+  }
+
+  const participantId =
+    data.participantId;
+
+  if (
+    typeof participantId !==
+      "string" ||
+    !participantId
+  ) {
+    return;
+  }
+
+  if (
+    !Array.isArray(
+      data.fragments
+    )
+  ) {
+    return;
+  }
+
+  const now =
+    performance.now();
+
+  let player =
+    disruptPlayers.get(
+      participantId
+    );
+
+  if (!player) {
+    player = new Map();
+
+    disruptPlayers.set(
+      participantId,
+      player
+    );
+  }
+
+  const incomingIds =
+    new Set();
+
+  for (
+    const f of data.fragments
+  ) {
+    if (!f) {
+      continue;
+    }
+
+    const id =
+      Number(f.id);
+
+    if (
+      !Number.isFinite(id) ||
+      !Number.isFinite(f.x) ||
+      !Number.isFinite(f.y) ||
+      !Number.isFinite(f.size) ||
+      !Number.isFinite(
+        f.remainingMs
+      )
+    ) {
+      continue;
+    }
+
+    const key =
+      fragmentKey(
+        participantId,
+        id
+      );
+
+    if (
+      spentFragments.has(key)
+    ) {
+      continue;
+    }
+
+    const remaining =
+      Math.max(
+        0,
+        Math.min(
+          5000,
+          f.remainingMs
+        )
+      );
+
+    if (
+      remaining <= 0
+    ) {
+      player.delete(id);
+      continue;
+    }
+
+    incomingIds.add(id);
+
+    const previous =
+      player.get(id);
+
+    player.set(id, {
+      id,
+      participantId,
+
+      x: Math.max(
+        0,
+        Math.min(1, f.x)
+      ),
+
+      y: Math.max(
+        0,
+        Math.min(1, f.y)
+      ),
+
+      size: Math.max(
+        .005,
+        Math.min(
+          .25,
+          f.size
+        )
+      ),
+
+      rotation:
+        Number.isFinite(
+          f.rotation
+        )
+          ? f.rotation
+          : 0,
+
+      color:
+        Array.isArray(f.color) &&
+        f.color.length >= 3
+          ? f.color
+              .slice(0, 3)
+              .map(
+                v => Math.max(
+                  0,
+                  Math.min(
+                    255,
+                    Number(v) || 0
+                  )
+                )
+              )
+          : [199,180,219],
+
+      shape:
+        Number.isFinite(
+          f.shape
+        )
+          ? Math.floor(
+              f.shape
+            ) % 4
+          : 0,
+
+      expiresAt:
+        now + remaining,
+
+      firstSeen:
+        previous
+          ? previous.firstSeen
+          : now,
+
+      lastSeen: now
+    });
+  }
+
+  // The phone sends its
+  // complete fragment list.
+  for (
+    const id of
+    player.keys()
+  ) {
+    if (
+      !incomingIds.has(id)
+    ) {
+      player.delete(id);
+    }
+  }
+}
+
+// ========================================
+// ARTWORK REMOVAL EVENT
+// ========================================
+
+function notifyArtworkRemoved(
+  artwork,
+  reason = "collision"
+) {
+  emitGame("artwork-erased", {
+    roundId,
+
+    artworkId:
+      artwork.artworkId,
+
+    participantId:
+      artwork.participantId,
+
+    reason,
+
+    dissolveMs: 300
+  });
+}
+
+// ========================================
+// COLLISION DETECTION
+// ========================================
+
+function checkCollisions(time) {
+  if (
+    gamePhase !== "playing"
+  ) {
+    return;
+  }
+
+  const w =
+    shared.clientWidth;
+
+  const h =
+    shared.clientHeight;
+
+  if (
+    w <= 0 ||
+    h <= 0 ||
+    sharedArtworks.length === 0
+  ) {
+    return;
+  }
+
+  const shortest =
+    Math.min(w, h);
+
+  for (
+    const [
+      participantId,
+      player
+    ] of disruptPlayers
+  ) {
+    for (
+      const [id, f]
+      of player
+    ) {
+      if (
+        time >= f.expiresAt
+      ) {
+        player.delete(id);
+        continue;
+      }
+
+      const key =
+        fragmentKey(
+          participantId,
+          id
+        );
+
+      if (
+        spentFragments.has(key)
+      ) {
+        player.delete(id);
+        continue;
+      }
+
+      const fx =
+        f.x * w;
+
+      const fy =
+        f.y * h;
+
+      const fragmentRadius =
+        f.size *
+        shortest *
+        .23;
+
+      let hitIndex = -1;
+
+      for (
+        let i =
+          sharedArtworks.length - 1;
+
+        i >= 0;
+
+        i--
+      ) {
+        const k =
+          sharedArtworks[i];
+
+        // Brief protection against
+        // accidental instant hits.
+        if (
+          time -
+          k.createdAt <
+          GAME.spawnProtectionMs
+        ) {
+          continue;
+        }
+
+        const position =
+          getArtworkPosition(
+            k,
+            w,
+            h,
+            time
+          );
+
+        const dx =
+          fx - position.x;
+
+        const dy =
+          fy - position.y;
+
+        const distance =
+          Math.hypot(
+            dx,
+            dy
+          );
+
+        const artworkRadius =
+          k.radius *
+          shortest *
+          .82;
+
+        if (
+          distance <
+          artworkRadius +
+          fragmentRadius
+        ) {
+          hitIndex = i;
+          break;
+        }
+      }
+
+      if (
+        hitIndex !== -1
+      ) {
+        const removed =
+          sharedArtworks.splice(
+            hitIndex,
+            1
+          )[0];
+
+        spentFragments.add(
+          key
+        );
+
+        player.delete(id);
+
+        totalHits++;
+
+        // Tell CREATE which
+        // artwork disappeared.
+        notifyArtworkRemoved(
+          removed,
+          "collision"
+        );
+
+        // Tell DISRUPT which
+        // fragment was consumed.
+        emitGame("fragment-hit", {
+          roundId,
+
+          participantId,
+          fragmentId: id,
+
+          artworkId:
+            removed.artworkId
+        });
+
+        // Recovery starts when
+        // CREATE has no artwork.
+        // DISRUPT fragments may
+        // still be visible.
+        if (
+          sharedArtworks.length ===
+          0
+        ) {
+          beginRecovery();
+        }
+
+        sendGameState();
+      }
+    }
+  }
+}
+
+// ========================================
+// CREATE RECOVERY
+// ========================================
+
+function beginRecovery() {
+  if (
+    gamePhase !== "playing"
+  ) {
+    return;
+  }
+
+  if (
+    recoveryEndsAt > 0
+  ) {
+    return;
+  }
+
+  recoveryEndsAt =
+    Date.now() +
+    GAME.recoveryMs;
+
+  recoveryStarted = true;
+
+  sendGameState();
+}
+
+function updateRecovery(now) {
+  if (
+    gamePhase !== "playing"
+  ) {
+    recoveryMessage.style.display =
+      "none";
+
+    return;
+  }
+
+  if (
+    sharedArtworks.length > 0
+  ) {
+    recoveryEndsAt = 0;
+
+    recoveryStarted = false;
+
+    recoveryMessage.style.display =
+      "none";
+
+    return;
+  }
+
+  if (
+    recoveryEndsAt === 0
+  ) {
+    beginRecovery();
+  }
+
+  const remaining =
+    recoveryEndsAt - now;
+
+  if (
+    remaining <= 0
+  ) {
+    recoveryMessage.style.display =
+      "none";
+
+    finishGame(
+      "disrupt"
+    );
+
+    return;
+  }
+
+  recoveryMessage.style.display =
+    "block";
+
+  recoveryNumber.textContent =
+    Math.ceil(
+      remaining / 1000
+    );
+}
+
+// ========================================
+// WINNER
+// ========================================
+
+function finishGame(winner) {
+  if (
+    gamePhase === "finished"
+  ) {
+    return;
+  }
+
+  gamePhase = "finished";
+
+  gameWinner = winner;
+
+  recoveryEndsAt = 0;
+
+  recoveryMessage.style.display =
+    "none";
+
+  countdownOverlay.style.display =
+    "none";
+
+  if (
+    winner === "create"
+  ) {
+    endTitle.textContent =
+      "Creation Prevails";
+
+    endSubtitle.textContent =
+      "Creation is vulnerable, but creativity is continuous.";
+
+    endSymbol.textContent =
+      "✦";
+
+  } else {
+    endTitle.textContent =
+      "All Artworks Erased";
+
+    endSubtitle.textContent =
+      "Keep creating. We never stop.";
+
+    endSymbol.textContent =
+      "◇";
+  }
+
+  endOverlay.style.display =
+    "flex";
+
+  emitGame("game-over", {
+    roundId,
+    winner,
+
+    artworkCount:
+      sharedArtworks.length,
+
+    totalHits
+  });
+}
+
+// ========================================
+// GAME TIMER
+// ========================================
+
+function updateGame(now) {
+  if (
+    gamePhase === "countdown"
+  ) {
+    const remaining =
+      countdownEndsAt - now;
+
+    if (
+      remaining <= 0
+    ) {
+      countdownNumber.textContent =
+        "GO!";
+
+      startRound();
+      return;
+    }
+
+    const number =
+      Math.max(
+        1,
+        Math.ceil(
+          remaining / 1000
+        )
+      );
+
+    countdownNumber.textContent =
+      number;
+
+    lastCountdownShown =
+      number;
+
+    return;
+  }
+
+  if (
+    gamePhase !== "playing"
+  ) {
+    return;
+  }
+
+  const remaining =
+    Math.max(
+      0,
+      roundEndsAt - now
+    );
+
+  timerElement.textContent =
+    "00:" +
+    String(
+      Math.ceil(
+        remaining / 1000
+      )
+    ).padStart(2, "0");
+
+  // The 30-second limit
+  // determines the winner.
+  if (
+    remaining <= 0
+  ) {
+    finishGame(
+      sharedArtworks.length > 0
+        ? "create"
+        : "disrupt"
+    );
+
+    return;
+  }
+
+  updateRecovery(now);
+
+  if (
+    gamePhase !== "playing"
+  ) {
+    return;
+  }
+
+  if (
+    now - lastStateSentAt >=
+    GAME.stateSendMs
+  ) {
+    sendGameState();
+  }
+}
+
+// ========================================
+// CLEAR AND RESET
+// ========================================
+
+function clearRoundArtwork() {
+  sharedArtworks = [];
+
+  disruptPlayers.clear();
+
+  spentFragments.clear();
+
+  nextArtworkId = 1;
+
+  totalHits = 0;
+}
+
+function resetGame() {
+  emitGame("game-reset", {
+    roundId
+  });
+
+  gamePhase = "lobby";
+
+  gameArmed = false;
+
+  roundId = null;
+
+  countdownEndsAt = 0;
+  roundEndsAt = 0;
+  recoveryEndsAt = 0;
+
+  recoveryStarted = false;
+
+  gameWinner = null;
+
+  lastCountdownShown = null;
+
+  readyPlayers.clear();
+
+  clearRoundArtwork();
+
+  document.body.classList.remove(
+    "playing"
+  );
+
+  countdownOverlay.style.display =
+    "none";
+
+  recoveryMessage.style.display =
+    "none";
+
+  endOverlay.style.display =
+    "none";
+
+  timerElement.textContent =
+    "00:30";
+
+  updateLobbyStatus();
+
+  resizeAll();
+}
+
+// ========================================
 // CANVAS RESIZE
-// =======================================
+// ========================================
 
-function resizeCanvas2D(canvas, ctx) {
-  const rect = canvas.getBoundingClientRect();
-  const dpr = Math.min(
-    window.devicePixelRatio || 1,
-    2
+function resizeCanvas2D(
+  canvas,
+  ctx
+) {
+  const rect =
+    canvas.getBoundingClientRect();
+
+  const dpr =
+    Math.min(
+      window.devicePixelRatio || 1,
+      2
+    );
+
+  canvas.width =
+    Math.round(
+      rect.width * dpr
+    );
+
+  canvas.height =
+    Math.round(
+      rect.height * dpr
+    );
+
+  ctx.setTransform(
+    dpr,
+    0,
+    0,
+    dpr,
+    0,
+    0
   );
-
-  canvas.width = Math.round(rect.width * dpr);
-  canvas.height = Math.round(rect.height * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
-// =======================================
-// ORIGINAL MOVING PASTEL CIRCLE
-// =======================================
+function resizeAll() {
+  resizeCanvas2D(
+    preview,
+    pctx
+  );
+
+  resizeCanvas2D(
+    shared,
+    sctx
+  );
+}
+
+// ========================================
+// WELCOME PARTICLES
+// ========================================
 
 function createParticles() {
   particles = [];
 
-  for (let i = 0; i < 850; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const radius = Math.sqrt(Math.random());
+  for (
+    let i = 0;
+    i < 850;
+    i++
+  ) {
+    const angle =
+      Math.random() *
+      Math.PI * 2;
+
+    const radius =
+      Math.sqrt(
+        Math.random()
+      );
 
     particles.push({
       angle,
       radius,
-      size: 1 + Math.random() * 5,
-      speed: (Math.random() - .5) * .0005,
-      color: colors[
-        Math.floor(Math.random() * colors.length)
-      ],
-      phase: Math.random() * Math.PI * 2
+
+      size:
+        1 +
+        Math.random() * 5,
+
+      speed:
+        (
+          Math.random() - .5
+        ) * .0005,
+
+      color:
+        colors[
+          Math.floor(
+            Math.random() *
+            colors.length
+          )
+        ],
+
+      phase:
+        Math.random() *
+        Math.PI * 2
     });
   }
 }
 
 function drawPreview(time) {
-  const w = preview.clientWidth;
-  const h = preview.clientHeight;
+  const w =
+    preview.clientWidth;
 
-  pctx.clearRect(0, 0, w, h);
+  const h =
+    preview.clientHeight;
 
-  const cx = w / 2;
-  const cy = h / 2;
-  const scale = Math.min(w, h) * .38;
+  pctx.clearRect(
+    0,
+    0,
+    w,
+    h
+  );
 
-  const glow = pctx.createRadialGradient(
-    cx, cy, 0,
-    cx, cy, scale * 1.4
+  const cx =
+    w / 2;
+
+  const cy =
+    h / 2;
+
+  const scale =
+    Math.min(w, h) * .38;
+
+  const glow =
+    pctx.createRadialGradient(
+      cx,
+      cy,
+      0,
+
+      cx,
+      cy,
+      scale * 1.4
+    );
+
+  glow.addColorStop(
+    0,
+    "rgba(235,197,188,.48)"
   );
 
   glow.addColorStop(
-    0, "rgba(235,197,188,.48)"
+    .6,
+    "rgba(196,185,212,.18)"
   );
 
   glow.addColorStop(
-    .6, "rgba(196,185,212,.18)"
+    1,
+    "rgba(196,185,212,0)"
   );
 
-  glow.addColorStop(
-    1, "rgba(196,185,212,0)"
-  );
+  pctx.fillStyle =
+    glow;
 
-  pctx.fillStyle = glow;
   pctx.beginPath();
+
   pctx.arc(
-    cx, cy, scale * 1.4,
-    0, Math.PI * 2
+    cx,
+    cy,
+    scale * 1.4,
+    0,
+    Math.PI * 2
   );
+
   pctx.fill();
 
-  for (const p of particles) {
-    const a = p.angle + time * p.speed;
-    const r = p.radius * scale;
+  for (
+    const p of particles
+  ) {
+    const a =
+      p.angle +
+      time * p.speed;
 
-    const x = cx + Math.cos(a) * r;
-    const y = cy + Math.sin(a) * r * .85;
+    const r =
+      p.radius * scale;
+
+    const x =
+      cx +
+      Math.cos(a) * r;
+
+    const y =
+      cy +
+      Math.sin(a) *
+      r * .85;
 
     const breathe =
       1 +
-      Math.sin(time * .0008 + p.phase) * .15;
+      Math.sin(
+        time * .0008 +
+        p.phase
+      ) * .15;
 
     pctx.save();
+
     pctx.translate(x, y);
-    pctx.rotate(a + time * .00008);
-    pctx.globalAlpha = .35 + p.radius * .55;
-    pctx.fillStyle = p.color;
+
+    pctx.rotate(
+      a +
+      time * .00008
+    );
+
+    pctx.globalAlpha =
+      .35 +
+      p.radius * .55;
+
+    pctx.fillStyle =
+      p.color;
 
     pctx.fillRect(
       -p.size / 2,
       -p.size / 2,
+
       p.size * breathe,
-      p.size * 1.6 * breathe
+
+      p.size *
+      1.6 *
+      breathe
     );
 
     pctx.restore();
   }
 }
 
-// =======================================
-// SHARED KALEIDOSCOPE DRAWING
-// =======================================
+// ========================================
+// COLOUR HELPERS
+// ========================================
 
 function rgba(c, alpha) {
   return (
@@ -793,90 +2854,192 @@ function rgba(c, alpha) {
     c[0] + "," +
     c[1] + "," +
     c[2] + "," +
-    Math.max(0, Math.min(1, alpha)) +
+    Math.max(
+      0,
+      Math.min(1, alpha)
+    ) +
     ")"
   );
 }
 
-function drawGlassFragment(ctx, type, s, c, opacity) {
-  ctx.fillStyle = rgba(c, .49 * opacity);
+// ========================================
+// KALEIDOSCOPE GLASS SHAPES
+// ========================================
 
-  ctx.strokeStyle = rgba(
-    c.map(v => Math.min(255, v + 25)),
-    .57 * opacity
-  );
+function drawGlassFragment(
+  ctx,
+  type,
+  s,
+  c,
+  opacity
+) {
+  ctx.fillStyle =
+    rgba(
+      c,
+      .49 * opacity
+    );
+
+  ctx.strokeStyle =
+    rgba(
+      c.map(
+        v => Math.min(
+          255,
+          v + 25
+        )
+      ),
+
+      .57 * opacity
+    );
 
   ctx.lineWidth = .7;
+
   ctx.beginPath();
 
-  if (type === 0) {
-    ctx.moveTo(-s * .5, -s * .1);
-    ctx.lineTo(-s * .15, -s * .45);
-    ctx.lineTo(s * .48, -s * .18);
-    ctx.lineTo(s * .3, s * .38);
-    ctx.lineTo(-s * .3, s * .28);
+  if (
+    type === 0
+  ) {
+    ctx.moveTo(
+      -s * .5,
+      -s * .1
+    );
+
+    ctx.lineTo(
+      -s * .15,
+      -s * .45
+    );
+
+    ctx.lineTo(
+      s * .48,
+      -s * .18
+    );
+
+    ctx.lineTo(
+      s * .3,
+      s * .38
+    );
+
+    ctx.lineTo(
+      -s * .3,
+      s * .28
+    );
+
     ctx.closePath();
-  } else if (type === 1) {
+
+  } else if (
+    type === 1
+  ) {
     ctx.rect(
       -s * .45,
       -s * .25,
       s * .9,
       s * .5
     );
-  } else if (type === 2) {
-    ctx.moveTo(-s * .45, s * .3);
-    ctx.lineTo(0, -s * .48);
-    ctx.lineTo(s * .45, s * .3);
+
+  } else if (
+    type === 2
+  ) {
+    ctx.moveTo(
+      -s * .45,
+      s * .3
+    );
+
+    ctx.lineTo(
+      0,
+      -s * .48
+    );
+
+    ctx.lineTo(
+      s * .45,
+      s * .3
+    );
+
     ctx.closePath();
+
   } else {
-    ctx.arc(0, 0, s * .35, 0, Math.PI * 2);
+    ctx.arc(
+      0,
+      0,
+      s * .35,
+      0,
+      Math.PI * 2
+    );
   }
 
   ctx.fill();
   ctx.stroke();
 
-  ctx.fillStyle = rgba(
-    [255,255,255],
-    .22 * opacity
-  );
+  ctx.fillStyle =
+    rgba(
+      [255,255,255],
+      .22 * opacity
+    );
 
   ctx.beginPath();
+
   ctx.arc(
     -s * .12,
     -s * .12,
+
     s * .07,
+
     0,
     Math.PI * 2
   );
+
   ctx.fill();
 }
 
 function drawFragmentGroup(
-  ctx, k, radius, opacity, time
+  ctx,
+  k,
+  radius,
+  opacity,
+  time
 ) {
-  for (const f of k.fragments) {
+  for (
+    const f of k.fragments
+  ) {
     ctx.save();
 
     const drift =
-      Math.sin(time * .005 + f.phase) *
+      Math.sin(
+        time * .005 +
+        f.phase
+      ) *
       radius * .02;
 
     ctx.translate(
-      radius * f.distance + drift,
-      radius * f.offset
+      radius *
+      f.distance +
+      drift,
+
+      radius *
+      f.offset
     );
 
     ctx.rotate(
       f.rotation +
-      Math.sin(time * .002 + f.phase) * .06
+      Math.sin(
+        time * .002 +
+        f.phase
+      ) * .06
     );
 
-    const size = radius * f.size;
-    const c = k.colors[f.colorIndex];
+    const size =
+      radius * f.size;
+
+    const c =
+      k.colors[
+        f.colorIndex
+      ];
 
     if (c) {
       drawGlassFragment(
-        ctx, f.type, size, c, opacity
+        ctx,
+        f.type,
+        size,
+        c,
+        opacity
       );
     }
 
@@ -884,46 +3047,91 @@ function drawFragmentGroup(
   }
 }
 
+// ========================================
+// DRAW KALEIDOSCOPE
+// ========================================
+
 function drawOneKaleidoscope(
-  ctx, k, w, h, time, opacity
+  ctx,
+  k,
+  w,
+  h,
+  time,
+  opacity
 ) {
-  const shortest = Math.min(w, h);
-  const radius = k.radius * shortest;
+  const shortest =
+    Math.min(w, h);
+
+  const radius =
+    k.radius * shortest;
+
+  const position =
+    getArtworkPosition(
+      k,
+      w,
+      h,
+      time
+    );
 
   const x =
-    k.x * w +
-    Math.sin(
-      time * k.driftSpeedX + k.phase
-    ) * k.driftX * w;
+    position.x;
 
   const y =
-    k.y * h +
-    Math.cos(
-      time * k.driftSpeedY + k.phase
-    ) * k.driftY * h;
+    position.y;
+
+  // Convert milliseconds to
+  // approximately 60 FPS frames.
+  // This keeps breathing gentle.
+  const frameTime =
+    time / 16.667;
 
   const breathing =
     1 +
     Math.sin(
-      time * k.breathSpeed + k.phase
+      frameTime *
+      (
+        Number.isFinite(
+          k.breathSpeed
+        )
+          ? k.breathSpeed
+          : .02
+      ) +
+      (
+        k.phase || 0
+      )
     ) * .035;
 
   ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(breathing, breathing);
-  ctx.rotate(k.rotationNow);
 
-  ctx.fillStyle = rgba(
-    k.colors[0],
-    .047 * opacity
+  ctx.translate(x, y);
+
+  ctx.scale(
+    breathing,
+    breathing
   );
+
+  ctx.rotate(
+    k.rotationNow
+  );
+
+  ctx.fillStyle =
+    rgba(
+      k.colors[0],
+      .047 * opacity
+    );
 
   ctx.beginPath();
+
   ctx.arc(
-    0, 0,
+    0,
+    0,
+
     radius * 1.125,
-    0, Math.PI * 2
+
+    0,
+    Math.PI * 2
   );
+
   ctx.fill();
 
   for (
@@ -934,143 +3142,459 @@ function drawOneKaleidoscope(
     ctx.save();
 
     ctx.rotate(
-      section * Math.PI * 2 / k.sections
+      section *
+      Math.PI * 2 /
+      k.sections
     );
 
     drawFragmentGroup(
-      ctx, k, radius, opacity, time
+      ctx,
+      k,
+      radius,
+      opacity,
+      frameTime
     );
 
     ctx.scale(1, -1);
 
     drawFragmentGroup(
-      ctx, k, radius, opacity, time
+      ctx,
+      k,
+      radius,
+      opacity,
+      frameTime
     );
 
     ctx.restore();
   }
 
-  ctx.strokeStyle = rgba(
-    k.colors[1],
-    .275 * opacity
-  );
+  ctx.strokeStyle =
+    rgba(
+      k.colors[1],
+      .275 * opacity
+    );
 
   ctx.lineWidth = .8;
+
   ctx.beginPath();
+
   ctx.arc(
-    0, 0,
+    0,
+    0,
+
     radius * .125,
-    0, Math.PI * 2
+
+    0,
+    Math.PI * 2
   );
+
   ctx.stroke();
 
-  ctx.fillStyle = rgba(
-    [255,255,255],
-    .7 * opacity
-  );
+  ctx.fillStyle =
+    rgba(
+      [255,255,255],
+      .7 * opacity
+    );
 
   ctx.beginPath();
+
   ctx.arc(
-    0, 0,
+    0,
+    0,
+
     radius * .03,
-    0, Math.PI * 2
+
+    0,
+    Math.PI * 2
   );
+
   ctx.fill();
 
   ctx.restore();
 }
 
-function drawShared(time) {
-  const w = shared.clientWidth;
-  const h = shared.clientHeight;
+// ========================================
+// DRAW DISRUPT FRAGMENTS
+// ========================================
 
-  sctx.clearRect(0, 0, w, h);
+function drawDisruptFragment(
+  ctx,
+  f,
+  w,
+  h,
+  time
+) {
+  const remaining =
+    f.expiresAt - time;
 
-  const count = sharedArtworks.length;
+  if (
+    remaining <= 0
+  ) {
+    return;
+  }
 
-  for (let i = 0; i < count; i++) {
-    const k = sharedArtworks[i];
-    const opacity = getOpacity(k, time);
-    const age = count - 1 - i;
-
-    const ageProgress = Math.min(
-      1,
-      age / FADE_LAYERS
+  const appear =
+    Math.max(
+      0,
+      Math.min(
+        1,
+        (
+          time -
+          f.firstSeen
+        ) / 200
+      )
     );
 
+  const fadeOut =
+    Math.max(
+      0,
+      Math.min(
+        1,
+        remaining / 500
+      )
+    );
+
+  const opacity =
+    appear * fadeOut;
+
+  const x =
+    f.x * w;
+
+  const y =
+    f.y * h;
+
+  const s =
+    f.size *
+    Math.min(w, h) *
+    .65;
+
+  const c =
+    f.color;
+
+  ctx.save();
+
+  ctx.translate(x, y);
+  ctx.rotate(f.rotation);
+
+  ctx.fillStyle =
+    rgba(
+      c,
+      .65 * opacity
+    );
+
+  ctx.strokeStyle =
+    rgba(
+      c.map(
+        v => Math.min(
+          255,
+          v + 25
+        )
+      ),
+
+      .7 * opacity
+    );
+
+  ctx.lineWidth = .8;
+
+  ctx.beginPath();
+
+  if (
+    f.shape === 0
+  ) {
+    ctx.rect(
+      -s * .5,
+      -s * .23,
+
+      s,
+      s * .46
+    );
+
+  } else if (
+    f.shape === 1
+  ) {
+    ctx.moveTo(
+      -s * .5,
+      -s * .25
+    );
+
+    ctx.lineTo(
+      s * .25,
+      -s * .4
+    );
+
+    ctx.lineTo(
+      s * .5,
+      s * .2
+    );
+
+    ctx.lineTo(
+      -s * .2,
+      s * .35
+    );
+
+    ctx.closePath();
+
+  } else if (
+    f.shape === 2
+  ) {
+    ctx.moveTo(
+      -s * .45,
+      s * .3
+    );
+
+    ctx.lineTo(
+      0,
+      -s * .45
+    );
+
+    ctx.lineTo(
+      s * .5,
+      s * .25
+    );
+
+    ctx.closePath();
+
+  } else {
+    ctx.rect(
+      -s * .25,
+      -s * .45,
+
+      s * .5,
+      s * .9
+    );
+  }
+
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// ========================================
+// DRAW SHARED CANVAS
+// ========================================
+
+function drawShared(time) {
+  const w =
+    shared.clientWidth;
+
+  const h =
+    shared.clientHeight;
+
+  sctx.clearRect(
+    0,
+    0,
+    w,
+    h
+  );
+
+  // Collisions are authoritative
+  // only while the round runs.
+  if (
+    gamePhase === "playing"
+  ) {
+    checkCollisions(time);
+  }
+
+  const count =
+    sharedArtworks.length;
+
+  for (
+    let i = 0;
+    i < count;
+    i++
+  ) {
+    const k =
+      sharedArtworks[i];
+
+    const opacity =
+      getOpacity(
+        k,
+        time
+      );
+
+    const age =
+      count - 1 - i;
+
+    const ageProgress =
+      Math.min(
+        1,
+        age / FADE_LAYERS
+      );
+
     const speedMultiplier =
-      1 - ageProgress * .8;
+      1 -
+      ageProgress * .8;
 
     k.rotationNow +=
-      k.rotationSpeed * speedMultiplier;
+      (
+        k.rotationSpeed ||
+        0
+      ) *
+      speedMultiplier;
 
     drawOneKaleidoscope(
       sctx,
       k,
       w,
       h,
-      time / 16.667,
+      time,
       opacity
     );
   }
+
+  // DISRUPT fragments remain
+  // visible even if CREATE
+  // artwork count is zero.
+  for (
+    const player of
+    disruptPlayers.values()
+  ) {
+    for (
+      const [id, f]
+      of player
+    ) {
+      if (
+        time >= f.expiresAt
+      ) {
+        player.delete(id);
+        continue;
+      }
+
+      drawDisruptFragment(
+        sctx,
+        f,
+        w,
+        h,
+        time
+      );
+    }
+  }
 }
 
-// =======================================
-// ANIMATION
-// =======================================
+// ========================================
+// CONNECTION STATUS
+// ========================================
 
-function updateConnectionStatus() {
-  const connected =
-    typeof shareConnected !== "undefined" &&
-    shareConnected;
+function countActiveFragments(time) {
+  let count = 0;
 
-  statusElement.textContent = connected
-    ? "Share connected · " +
-      sharedArtworks.length +
-      " scoops received"
-    : "Waiting for Share connection";
+  for (
+    const player of
+    disruptPlayers.values()
+  ) {
+    for (
+      const f of
+      player.values()
+    ) {
+      if (
+        time < f.expiresAt
+      ) {
+        count++;
+      }
+    }
+  }
+
+  return count;
 }
+
+function updateConnectionStatus(time) {
+  if (
+    !isConnected()
+  ) {
+    statusElement.textContent =
+      "Waiting for Share connection";
+
+    return;
+  }
+
+  statusElement.textContent =
+    "Share connected · " +
+    sharedArtworks.length +
+    " artworks · " +
+    countActiveFragments(time) +
+    " fragments · " +
+    totalHits +
+    " hits";
+}
+
+// ========================================
+// MAIN ANIMATION
+// ========================================
 
 function animate(time) {
   drawPreview(time);
 
-  if (playing) {
+  const now =
+    Date.now();
+
+  updateGame(now);
+
+  if (
+    gamePhase !== "lobby"
+  ) {
     drawShared(time);
   }
 
-  updateConnectionStatus();
-  requestAnimationFrame(animate);
+  updateConnectionStatus(time);
+
+  requestAnimationFrame(
+    animate
+  );
 }
 
-function resizeAll() {
-  resizeCanvas2D(preview, pctx);
-  resizeCanvas2D(shared, sctx);
-}
-
-// =======================================
+// ========================================
 // BUTTONS
-// =======================================
+// ========================================
 
-document.getElementById("startButton")
-  .addEventListener("click", () => {
-    playing = true;
-    document.body.classList.add("playing");
-    resizeAll();
-  });
+startButton.addEventListener(
+  "click",
+  () => {
+    gameArmed = true;
 
-document.getElementById("resetButton")
-  .addEventListener("click", () => {
-    sharedArtworks = [];
-    playing = false;
-    document.body.classList.remove("playing");
-    resizeAll();
-  });
+    updateLobbyStatus();
 
-window.addEventListener("resize", resizeAll);
+    tryStartCountdown();
+  }
+);
+
+document.getElementById(
+  "resetButton"
+).addEventListener(
+  "click",
+  resetGame
+);
+
+document.getElementById(
+  "playAgainButton"
+).addEventListener(
+  "click",
+  resetGame
+);
+
+// ========================================
+// RESIZE
+// ========================================
+
+window.addEventListener(
+  "resize",
+  resizeAll
+);
+
+// ========================================
+// START
+// ========================================
 
 createParticles();
+
 resizeAll();
-requestAnimationFrame(animate);
+
+updateLobbyStatus();
+
+requestAnimationFrame(
+  animate
+);
+
 </script>
 
 </body>
