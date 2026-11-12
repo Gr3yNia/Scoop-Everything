@@ -38,16 +38,17 @@ const ART = {
   lifetimeMs: 5000,
   minSize: 24,
   maxSize: 72,
-  movementStrength: 0.00013,
+  movementStrength: 0.0045,
   maxSpeed: 0.006,
-  motionDeadzone: 0.004,
-  movementThreshold: 0.08,
+  motionDeadzone: 0.05,
+  movementThreshold: 0.06,
+  fullTilt: 0.3,
   movingFriction: 0.91,
   restingFriction: 0.68,
   shakeThreshold: 1.8,
   shakeMaximum: 15,
   shakeCooldown: 250,
-  shakeStrength: 0.004,
+  shakeStrength: 0.008,
   appearMs: 350,
   fadeOutMs: 500
 };
@@ -120,6 +121,15 @@ let previousTiltX = null;
 let previousTiltY = null;
 let previousMotionTime = null;
 
+// Neutral holding pose for the round. Captured from the first frames of
+// play, so "neutral" means however the player is already holding the
+// phone rather than one fixed orientation.
+let neutralX = null;
+let neutralY = null;
+let neutralSamples = 0;
+
+// Normalised tilt, -1..1 per axis. updateFragment() turns these into
+// fragment velocity.
 let motionX = 0;
 let motionY = 0;
 let motionMagnitude = 0;
@@ -715,6 +725,10 @@ function beginGame(data) {
   previousMotionTime = null;
   previousAcceleration = null;
 
+  neutralX = null;
+  neutralY = null;
+  neutralSamples = 0;
+
   shakeEnergy = 0;
 
   trackedFingerId = null;
@@ -841,6 +855,10 @@ function resetGame() {
   previousTiltY = null;
   previousMotionTime = null;
   previousAcceleration = null;
+
+  neutralX = null;
+  neutralY = null;
+  neutralSamples = 0;
 
   shakeEnergy = 0;
   lastSendAt = 0;
@@ -1221,57 +1239,58 @@ function createFragment() {
 // TILT MOVEMENT
 // ========================================
 
-function updatePhoneMovement() {
-  const now = performance.now();
+// Averages the first frames of a round into the neutral holding pose, so
+// one jittery sample is never mistaken for "rest".
+const NEUTRAL_FRAMES = 15;
 
-  const rawX = rotationY;
-  const rawY = rotationX;
+// Deadzone plus smoothstep: no drift at rest, then speed ramps up with
+// the tilt angle until ART.fullTilt is reached.
+function tiltResponse(delta) {
+  const magnitude = abs(delta);
 
-  if (
-    !Number.isFinite(rawX) ||
-    !Number.isFinite(rawY)
-  ) {
-    motionX = 0;
-    motionY = 0;
-    motionMagnitude = 0;
-    return;
+  if (magnitude <= ART.motionDeadzone) {
+    return 0;
   }
 
-  if (
-    previousTiltX === null ||
-    previousTiltY === null
-  ) {
-    previousTiltX = rawX;
-    previousTiltY = rawY;
-    previousMotionTime = now;
-    return;
-  }
-
-  const dt = constrain(
-    (now - previousMotionTime) / 1000,
-    0.008,
-    0.1
+  const t = constrain(
+    (magnitude - ART.motionDeadzone) /
+      (ART.fullTilt - ART.motionDeadzone),
+    0,
+    1
   );
 
-  const deltaX = rawX - previousTiltX;
-  const deltaY = rawY - previousTiltY;
+  const eased = t * t * (3 - 2 * t);
 
-  previousTiltX = rawX;
-  previousTiltY = rawY;
-  previousMotionTime = now;
+  return delta < 0 ? -eased : eased;
+}
 
-  const cleanX =
-    abs(deltaX) > ART.motionDeadzone
-      ? deltaX
-      : 0;
+function updatePhoneMovement() {
+  const rx = Number.isFinite(rotationX)
+    ? rotationX
+    : 0;
 
-  const cleanY =
-    abs(deltaY) > ART.motionDeadzone
-      ? deltaY
-      : 0;
+  const ry = Number.isFinite(rotationY)
+    ? rotationY
+    : 0;
 
-  motionX = constrain(cleanX / dt, -8, 8);
-  motionY = constrain(cleanY / dt, -8, 8);
+  // Capture the neutral holding pose for this round.
+  if (neutralX === null || neutralY === null) {
+    neutralX = rx;
+    neutralY = ry;
+    neutralSamples = 1;
+  } else if (neutralSamples < NEUTRAL_FRAMES) {
+    neutralSamples++;
+
+    neutralX += (rx - neutralX) / neutralSamples;
+    neutralY += (ry - neutralY) / neutralSamples;
+  }
+
+  // Tilt relative to that pose. Tipping the top of the phone forward
+  // makes rotationX fall, tipping the right edge down raises rotationY.
+  // rotationY drives screen X, rotationX drives screen Y, so a forward
+  // tilt moves fragments up and a right tilt moves them right.
+  motionX = tiltResponse(ry - neutralY);
+  motionY = tiltResponse(rx - neutralX);
 
   motionMagnitude = sqrt(
     motionX * motionX +
@@ -1284,27 +1303,38 @@ function updatePhoneMovement() {
 // ========================================
 
 function updateFragment(f) {
-  const moving =
+  const engaged =
     motionMagnitude > ART.movementThreshold;
 
-  if (moving) {
-    f.vx +=
-      motionX *
-      ART.movementStrength *
-      f.speedFactor;
+  // Target velocity comes from the tilt angle: the greater the tilt,
+  // the faster the fragment travels, and it keeps travelling for as
+  // long as the phone is held at that angle.
+  const targetX = engaged
+    ? motionX * ART.movementStrength * f.speedFactor
+    : 0;
 
-    f.vy +=
-      motionY *
-      ART.movementStrength *
-      f.speedFactor;
-  }
+  const targetY = engaged
+    ? motionY * ART.movementStrength * f.speedFactor
+    : 0;
 
-  const damping = moving
-    ? ART.movingFriction
-    : ART.restingFriction;
+  // Ease toward the target instead of accumulating forces. While a
+  // shake is still ringing out the moving friction is held a little
+  // longer so the push reads as a shove; otherwise the resting friction
+  // brings the fragment smoothly back to a stop.
+  const gliding = shakeEnergy > 0;
 
-  f.vx *= damping;
-  f.vy *= damping;
+  const dampingX =
+    targetX !== 0 || gliding
+      ? ART.movingFriction
+      : ART.restingFriction;
+
+  const dampingY =
+    targetY !== 0 || gliding
+      ? ART.movingFriction
+      : ART.restingFriction;
+
+  f.vx = targetX + (f.vx - targetX) * dampingX;
+  f.vy = targetY + (f.vy - targetY) * dampingY;
 
   if (abs(f.vx) < 0.000025) f.vx = 0;
   if (abs(f.vy) < 0.000025) f.vy = 0;
