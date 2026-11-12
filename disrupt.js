@@ -182,6 +182,8 @@ function setup() {
     }
   });
 
+  shareConnect().catch(err => console.warn("share:", err));
+
   setupReadyScreen();
   setupGameOverlay();
 

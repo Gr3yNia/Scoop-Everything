@@ -1379,6 +1379,8 @@ function setup() {
       role: "display"
     }
   });
+
+  shareConnect().catch(err => console.warn("share:", err));
 }
 
 // ========================================
