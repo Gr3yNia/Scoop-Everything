@@ -166,9 +166,10 @@ button {
   position: absolute;
   width: min(65vw,900px);
   height: min(65vw,900px);
-  right: -6%;
-  top: 50%;
-  transform: translateY(-50%);
+  right: -34%;
+  bottom: -48%;
+  top: auto;
+  transform: none;
   pointer-events: none;
   opacity: .95;
 }
@@ -177,13 +178,15 @@ button {
 
 .qr-layer {
   position: absolute;
-  top: 17%;
+  top: 55%;
+  transform: translateY(-50%);
   right: 5%;
-  width: 45%;
+  width: 48%;
   z-index: 8;
 
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
+  gap: clamp(28px, 5vw, 90px);
   align-items: flex-start;
 
   pointer-events: none;
@@ -233,13 +236,14 @@ button {
 
 .qr-heading {
   position: absolute;
-  top: -34px;
+  top: -83px;
   left: 0;
   width: 100%;
   text-align: center;
   color: #737A8C;
-  font-size: 10px;
-  letter-spacing: .2em;
+  font-size: 11px;
+  letter-spacing: .13em;
+  line-height: 1.5;
 }
 
 .footer {
@@ -334,9 +338,10 @@ body.playing .exhibition {
 
 @media (max-width: 900px) {
   .qr-layer {
-    top: 12%;
-    right: 4%;
-    width: 48%;
+    top: 55%;
+    right: 3%;
+    width: 49%;
+    gap: 22px;
   }
 
   .qr-player {
@@ -375,20 +380,28 @@ body.playing .exhibition {
   #preview {
     width: 100vw;
     height: 100vw;
-    right: -30%;
-    top: 27%;
+    right: -38%;
+    bottom: -42%;
+    top: auto;
     opacity: .35;
   }
 
   .qr-layer {
-    top: 6%;
+    top: 55%;
     right: 5%;
     width: 90%;
-    justify-content: space-between;
+    justify-content: center;
+    gap: 24px;
   }
 
   .qr-player {
     width: 110px;
+  }
+
+  .qr-heading {
+    top: -65px;
+    font-size: 9px;
+    letter-spacing: .08em;
   }
 
   .qr-code,
@@ -428,7 +441,7 @@ body.playing .exhibition {
 
       <div class="details">
         <div class="detail">
-          <strong>2 - 4 Players</strong>
+          <strong>2+ Participants</strong>
           <span>Mobile interaction</span>
         </div>
 
@@ -452,23 +465,23 @@ body.playing .exhibition {
   <div class="qr-layer">
 
     <div class="qr-heading">
-      SCAN TO JOIN
+       CHOOSE HOW YOU WANT TO PLAY WITH THE ARTWORK
     </div>
 
     <div class="qr-player">
       <div class="qr-frame">
         <div class="qr-code" id="qrPlayer1"></div>
       </div>
-      <strong>PLAYER 01</strong>
-      <span>The Collector</span>
+      <strong>CREATE</strong>
+      <span>Scoop to build</span>
     </div>
 
     <div class="qr-player">
       <div class="qr-frame">
         <div class="qr-code" id="qrPlayer2"></div>
       </div>
-      <strong>PLAYER 02</strong>
-      <span>The Sculptor</span>
+      <strong>DISRUPT</strong>
+      <span>Move to erase</span>
     </div>
 
   </div>
