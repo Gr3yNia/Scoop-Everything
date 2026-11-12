@@ -160,7 +160,7 @@ button {
   font-size: 18px;
 }
 
-/* Original moving pastel circle */
+/* Animated pastel circle — bottom right */
 
 #preview {
   position: absolute;
@@ -174,7 +174,7 @@ button {
   opacity: .95;
 }
 
-/* QR codes: separate and positioned high */
+/* CREATE and DISRUPT QR codes */
 
 .qr-layer {
   position: absolute;
@@ -460,17 +460,17 @@ body.playing .exhibition {
 
   <canvas id="preview"></canvas>
 
-  <!-- QR codes over the moving circle -->
+  <!-- CREATE and DISRUPT QR codes -->
 
   <div class="qr-layer">
 
     <div class="qr-heading">
-       CHOOSE HOW YOU WANT TO PLAY WITH THE ARTWORK
+      CHOOSE HOW YOU WANT TO PLAY WITH THE ARTWORK
     </div>
 
     <div class="qr-player">
       <div class="qr-frame">
-        <div class="qr-code" id="qrPlayer1"></div>
+        <div class="qr-code" id="qrCreate"></div>
       </div>
       <strong>CREATE</strong>
       <span>Scoop to build</span>
@@ -478,7 +478,7 @@ body.playing .exhibition {
 
     <div class="qr-player">
       <div class="qr-frame">
-        <div class="qr-code" id="qrPlayer2"></div>
+        <div class="qr-code" id="qrDisrupt"></div>
       </div>
       <strong>DISRUPT</strong>
       <span>Move to erase</span>
@@ -521,11 +521,13 @@ const SHARE_HOST =
 const SHARE_ROOM = "scoop-everything-v2c";
 const SHARE_APP = "scoop-everything";
 
-const PLAYER1_URL =
-  "https://gr3ynia.github.io/Scoop-Everything/player1.html";
+// CREATE page
+const CREATE_URL =
+  "https://gr3ynia.github.io/Scoop-Everything/create.html";
 
-const PLAYER2_URL =
-  "https://gr3ynia.github.io/Scoop-Everything/player2.html";
+// DISRUPT page
+const DISRUPT_URL =
+  "https://gr3ynia.github.io/Scoop-Everything/disrupt.html";
 
 // =======================================
 // REAL QR CODES
@@ -551,8 +553,9 @@ function createQR(elementId, url) {
   );
 }
 
-createQR("qrPlayer1", PLAYER1_URL);
-createQR("qrPlayer2", PLAYER2_URL);
+// Updated QR code names and destinations
+createQR("qrCreate", CREATE_URL);
+createQR("qrDisrupt", DISRUPT_URL);
 
 // =======================================
 // ORIGINAL CANVASES
@@ -602,8 +605,7 @@ function setup() {
     }
   });
 
-  // No full-screen permission overlay.
-  // Check connection status in exhibition mode.
+  // Connection status is shown in exhibition mode.
 }
 
 // =======================================
