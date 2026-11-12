@@ -2,18 +2,23 @@
 /*
   SCOOP EVERYTHING — DISRUPT V2C
 
-  HOLD + SCOOP → Create 3 glass fragments
-  TILT         → Guide fragments
-  SHAKE        → Scatter fragments
-  REST         → Continue floating
+  SENSOR → GUIDE → READY → COUNTDOWN → PLAY → RESULT
 
-  Sends DISRUPT events to the shared display.
+  Hold + Scoop: release one glass fragment
+  Tilt: move fragments
+  Shake: scatter fragments
+  Rest: fragments slow down
+  Fragments expire after 5 seconds
 
-  Original Player 02 remains unchanged.
+  The shared display controls:
+  - Start and countdown
+  - 30-second round
+  - 5-second CREATE recovery
+  - Collisions and winner
 */
 
 // ========================================
-// SCOOP SETTINGS
+// SETTINGS
 // ========================================
 
 const SCOOP = {
@@ -26,35 +31,32 @@ const SCOOP = {
   smoothing: 0.25
 };
 
-// ========================================
-// ART SETTINGS
-// ========================================
-
 const ART = {
   background: [233, 234, 240],
-
-  fragmentsPerScoop: 3,
-  maxFragments: 45,
-
+  fragmentsPerScoop: 1,
+  maxFragments: 20,
+  lifetimeMs: 5000,
   minSize: 24,
   maxSize: 72,
-
-  movementStrength: 35,
-  maxSpeed: 3.5,
-
-  movingFriction: 0.995,
-  restingFriction: 0.995,
-
-  motionDeadzone: 0.0025,
-
+  movementStrength: 0.000018,
+  maxSpeed: 0.006,
+  motionDeadzone: 0.025,
+  movementThreshold: 0.08,
+  movingFriction: 0.91,
+  restingFriction: 0.68,
   shakeThreshold: 1.8,
   shakeMaximum: 15,
   shakeCooldown: 250,
-  shakeStrength: 0.65,
+  shakeStrength: 0.004,
+  appearMs: 350,
+  fadeOutMs: 500
+};
 
-  appearMs: 650,
-  breathingAmount: 0.045,
-  breathingSpeed: 0.018
+const GAME = {
+  roundMs: 30000,
+  recoveryMs: 5000,
+  countdownMs: 3000,
+  soundVolume: 0.03
 };
 
 const PALETTE = [
@@ -64,11 +66,16 @@ const PALETTE = [
   [227, 197, 162],
   [155, 170, 205],
   [238, 230, 223],
-  [177, 159, 193]
+  [177, 159, 193],
+  [203, 190, 216],
+  [190, 212, 225],
+  [235, 204, 190],
+  [183, 202, 180],
+  [222, 185, 202]
 ];
 
 // ========================================
-// SHARED DISPLAY CONNECTION
+// NETWORK
 // ========================================
 
 const SHARE_HOST =
@@ -77,23 +84,22 @@ const SHARE_HOST =
 const SHARE_ROOM = "scoop-everything-v2c";
 const SHARE_APP = "scoop-everything";
 
-const DISRUPT_MODE = "disrupt";
-
-// Each open page has its own participant ID.
 const DISRUPT_ID =
-  "disrupt-" +
-  Math.random().toString(36).slice(2, 10);
+  "disrupt-" + Math.random().toString(36).slice(2, 10);
 
-// Limit network messages to approximately 15 per second.
 const SEND_INTERVAL = 65;
 
 let lastSendAt = 0;
 
 // ========================================
-// GLOBAL VARIABLES
+// STATE
 // ========================================
 
 let sensorButton;
+let readyOverlay;
+let readyButton;
+let readyStatus;
+let gameOverlay;
 
 let trackedFingerId = null;
 let fingerHeld = false;
@@ -121,8 +127,21 @@ let motionMagnitude = 0;
 let previousAcceleration = null;
 let lastShakeAt = 0;
 let shakeEnergy = 0;
-
 let totalShakes = 0;
+let totalHits = 0;
+
+const spentFragmentIds = new Set();
+
+let gamePhase = "lobby";
+let playerReady = false;
+let roundId = null;
+
+let roundEndsAt = 0;
+let countdownEndsAt = 0;
+let recoveryEndsAt = 0;
+
+let gameWinner = null;
+let audioContext = null;
 
 // ========================================
 // SETUP
@@ -130,7 +149,6 @@ let totalShakes = 0;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
-
   pixelDensity(1);
   frameRate(60);
 
@@ -139,54 +157,80 @@ function setup() {
   );
 
   sensorButton.id("enable-sensors");
-
-  sensorButton.position(
-    width / 2 - 100,
-    height / 2 - 25
-  );
-
-  sensorButton.size(200, 50);
+  sensorButton.size(220, 54);
 
   sensorButton.style("background", "#343B4D");
   sensorButton.style("color", "#FFFFFF");
   sensorButton.style("border", "none");
-  sensorButton.style("border-radius", "25px");
+  sensorButton.style("border-radius", "28px");
   sensorButton.style("font-size", "13px");
+  sensorButton.style("z-index", "9000");
+
+  positionSensorButton();
 
   enableSensorOn("#enable-sensors");
   lockGestures();
 
-  // Connect to the same room as CREATE.
   shareSetup({
     host: SHARE_HOST,
     room: SHARE_ROOM,
     app: SHARE_APP,
     me: {
       name: "DISRUPT",
-      role: 2
+      role: 2,
+      participantId: DISRUPT_ID
     }
   });
+
+  setupReadyScreen();
+  setupGameOverlay();
 
   textAlign(CENTER, CENTER);
 }
 
+function positionSensorButton() {
+  if (!sensorButton) return;
+
+  sensorButton.position(
+    width / 2 - 110,
+    height / 2 - 27
+  );
+}
+
+function motionSensorsAreEnabled() {
+  return typeof sensorsEnabled !== "undefined"
+    ? Boolean(sensorsEnabled)
+    : Boolean(window.sensorsEnabled);
+}
+
 // ========================================
-// MAIN DRAW LOOP
+// DRAW
 // ========================================
 
 function draw() {
   background(...ART.background);
 
-  if (!window.sensorsEnabled) {
+  const sensorsOn = motionSensorsAreEnabled();
+
+  // STEP 1: SENSOR PERMISSION
+  if (!sensorsOn) {
+    if (readyOverlay) {
+      readyOverlay.style.display = "none";
+    }
+
+    if (sensorButton) {
+      sensorButton.show();
+    }
+
     noStroke();
     fill(52, 59, 77);
-    textSize(17);
     textAlign(CENTER, CENTER);
+    textSize(17);
 
     text(
-      "Tap the button to start",
+      "Enable motion sensors to begin",
       width / 2,
-      height / 2 - 75
+      height / 2 - 80
     );
 
     return;
@@ -196,41 +240,819 @@ function draw() {
     sensorButton.hide();
   }
 
+  // STEP 2: ROLE GUIDE
+  if (readyOverlay) {
+    readyOverlay.style.display =
+      gamePhase === "lobby" ? "flex" : "none";
+  }
+
   updateFinger();
-  updateScoopGesture();
 
-  updatePhoneMovement();
-  updateShake();
+  // STEP 3: GAMEPLAY
+  if (gamePhase === "playing") {
+    updateScoopGesture();
+    updatePhoneMovement();
+    updateShake();
 
-  for (const f of fragments) {
-    updateFragment(f);
-    drawFragment(f);
-  }
+    const now = millis();
+    const oldCount = fragments.length;
 
-  // Send fragment positions to the shared display.
-  sendFragmentPositions();
-
-  if (fragments.length === 0) {
-    noStroke();
-    fill(100, 106, 123);
-    textSize(18);
-    textAlign(CENTER, CENTER);
-
-    text(
-      "DISRUPT — Hold + Scoop!",
-      width / 2,
-      height * 0.62
+    fragments = fragments.filter(f =>
+      now < f.expiresAt &&
+      !spentFragmentIds.has(f.id)
     );
+
+    for (const f of fragments) {
+      updateFragment(f);
+      drawFragment(f);
+    }
+
+    sendFragmentPositions(
+      fragments.length !== oldCount
+    );
+
+    if (fragments.length === 0) {
+      noStroke();
+      fill(100, 106, 123);
+      textAlign(CENTER, CENTER);
+      textSize(18);
+
+      text(
+        "DISRUPT — Hold + Scoop!",
+        width / 2,
+        height * 0.62
+      );
+    }
+
+    drawDebug();
+    drawInstructions();
+
+  } else {
+    resetGestureWhenInactive();
   }
 
-  drawDebug();
-  drawInstructions();
+  updateGameOverlay();
+
+  // Reannounce readiness for late connections.
+  if (
+    playerReady &&
+    gamePhase === "lobby" &&
+    frameCount % 60 === 0
+  ) {
+    sendReady();
+  }
+}
+
+// ========================================
+// READY GUIDE
+// ========================================
+
+function setupReadyScreen() {
+  readyOverlay = document.createElement("div");
+
+  readyOverlay.id = "disrupt-ready-overlay";
+
+  readyOverlay.style.cssText = `
+    position:fixed;
+    inset:0;
+    z-index:8000;
+    background:#E9EAF0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    box-sizing:border-box;
+    font-family:system-ui,sans-serif;
+    color:#343B4D;
+    text-align:center;
+    overflow-y:auto;
+  `;
+
+  readyOverlay.innerHTML = `
+    <div style="
+      width:100%;
+      max-width:390px;
+      margin:auto;
+      background:#F8F8FA;
+      border-radius:24px;
+      padding:28px 23px;
+      box-sizing:border-box;
+    ">
+
+      <div style="
+        font-size:10px;
+        letter-spacing:2px;
+        color:#85899A;
+        margin-bottom:16px;
+      ">
+        SCOOP EVERYTHING / V2C
+      </div>
+
+      <div style="
+        font-size:38px;
+        line-height:1.2;
+        margin-bottom:12px;
+      ">
+        ◇
+      </div>
+
+      <h1 style="
+        font-size:30px;
+        font-weight:400;
+        margin:0 0 10px;
+      ">
+        DISRUPT
+      </h1>
+
+      <p style="
+        font-size:13px;
+        line-height:1.7;
+        color:#74798A;
+        margin:0 0 24px;
+      ">
+        Your role is to erase the artwork.
+      </p>
+
+      <div style="
+        background:white;
+        border-radius:16px;
+        padding:20px;
+        text-align:left;
+        font-size:13px;
+        line-height:1.8;
+        margin-bottom:22px;
+      ">
+
+        <div style="margin-bottom:10px">
+          <b>01.</b>
+          Hold your finger on the screen.
+        </div>
+
+        <div style="margin-bottom:10px">
+          <b>02.</b>
+          Scoop your phone to release
+          one glass fragment.
+        </div>
+
+        <div style="margin-bottom:10px">
+          <b>03.</b>
+          Tilt to chase artworks.
+          Shake to scatter fragments.
+        </div>
+
+        <div style="margin-bottom:10px">
+          <b>04.</b>
+          Each fragment disappears
+          after <b>5 seconds</b>.
+        </div>
+
+        <div>
+          <b>05.</b>
+          Erase every artwork.
+          If CREATE cannot recover
+          within <b>5 seconds</b>,
+          you win!
+        </div>
+
+      </div>
+
+      <p style="
+        font-size:12px;
+        color:#74798A;
+        margin:0 0 18px;
+      ">
+        You have 30 seconds to disrupt.
+      </p>
+
+      <button
+        id="disrupt-ready-button"
+        style="
+          width:100%;
+          padding:15px;
+          background:#343B4D;
+          color:white;
+          border:0;
+          border-radius:30px;
+          font-size:14px;
+          cursor:pointer;
+        "
+      >
+        I'm Ready
+      </button>
+
+      <p
+        id="disrupt-ready-status"
+        style="
+          font-size:12px;
+          color:#85899A;
+          margin:18px 0 0;
+          line-height:1.5;
+        "
+      >
+        Waiting for you to get ready.
+      </p>
+
+    </div>
+  `;
+
+  document.body.appendChild(readyOverlay);
+
+  readyButton = document.getElementById(
+    "disrupt-ready-button"
+  );
+
+  readyStatus = document.getElementById(
+    "disrupt-ready-status"
+  );
+
+  readyButton.addEventListener("click", () => {
+    if (playerReady) return;
+
+    unlockGameAudio();
+
+    playerReady = true;
+    readyButton.disabled = true;
+    readyButton.textContent = "Ready ✓";
+    readyButton.style.background = "#9B9EAD";
+
+    readyStatus.textContent =
+      "Waiting for CREATE to be ready...";
+
+    sendReady();
+  });
+}
+
+function sendReady() {
+  if (
+    !playerReady ||
+    typeof shareEmit !== "function"
+  ) {
+    return;
+  }
+
+  shareEmit("player-ready", {
+    player: 2,
+    mode: "disrupt",
+    participantId: DISRUPT_ID,
+    ready: true
+  });
+}
+
+// ========================================
+// GAME HUD
+// ========================================
+
+function setupGameOverlay() {
+  gameOverlay = document.createElement("div");
+
+  gameOverlay.id = "disrupt-game-overlay";
+
+  gameOverlay.style.cssText = `
+    position:fixed;
+    top:18px;
+    left:50%;
+    transform:translateX(-50%);
+    z-index:5000;
+    pointer-events:none;
+    text-align:center;
+    font-family:system-ui,sans-serif;
+    color:#343B4D;
+    width:calc(100% - 120px);
+    max-width:340px;
+    display:none;
+  `;
+
+  document.body.appendChild(gameOverlay);
+}
+
+function updateGameOverlay() {
+  if (!gameOverlay) return;
+
+  const now = Date.now();
+
+  if (
+    gamePhase === "lobby" ||
+    gamePhase === "waiting" ||
+    gamePhase === "finished"
+  ) {
+    gameOverlay.style.display = "none";
+    return;
+  }
+
+  gameOverlay.style.display = "block";
+
+  if (gamePhase === "countdown") {
+    const seconds = Math.max(
+      1,
+      Math.ceil((countdownEndsAt - now) / 1000)
+    );
+
+    gameOverlay.innerHTML = `
+      <div style="
+        font-size:46px;
+        font-weight:300;
+      ">
+        ${seconds}
+      </div>
+      <div style="font-size:12px">
+        Get ready to disrupt
+      </div>
+    `;
+
+    // Do not start gameplay until the
+    // shared display sends game-start.
+    if (now >= countdownEndsAt) {
+      gameOverlay.innerHTML = `
+        <div style="
+          background:rgba(255,255,255,.9);
+          border-radius:24px;
+          padding:12px 18px;
+          font-size:13px;
+        ">
+          Starting...
+        </div>
+      `;
+    }
+
+    return;
+  }
+
+  if (gamePhase === "playing") {
+    const remaining = Math.max(
+      0,
+      Math.ceil((roundEndsAt - now) / 1000)
+    );
+
+    let recoveryHTML = "";
+
+    if (recoveryEndsAt > now) {
+      const recovery = Math.ceil(
+        (recoveryEndsAt - now) / 1000
+      );
+
+      recoveryHTML = `
+        <div style="
+          margin-top:8px;
+          padding:9px 12px;
+          background:rgba(255,255,255,.94);
+          border-radius:14px;
+          font-size:13px;
+        ">
+          <b style="
+            color:#B77C78;
+            font-size:19px;
+          ">
+            ${recovery}
+          </b>
+          <div>No artworks remain!</div>
+          <div style="font-size:11px">
+            Stop CREATE from recovering.
+          </div>
+        </div>
+      `;
+    }
+
+    gameOverlay.innerHTML = `
+      <div style="
+        background:rgba(255,255,255,.87);
+        border-radius:30px;
+        padding:8px 15px;
+        display:inline-block;
+        font-size:13px;
+      ">
+        DISRUPT · ${remaining}s
+      </div>
+      ${recoveryHTML}
+    `;
+  }
+}
+
+// ========================================
+// SHARED EVENTS
+// ========================================
+
+function shareEvent(name, data, from) {
+  if (!data) return;
+
+  switch (name) {
+    case "game-countdown":
+      beginCountdown(data);
+      break;
+
+    case "game-start":
+      beginGame(data);
+      break;
+
+    case "game-state":
+      synchronizeGame(data);
+      break;
+
+    case "fragment-hit":
+      receiveFragmentHit(data);
+      break;
+
+    case "game-over":
+      finishGame(data);
+      break;
+
+    case "game-reset":
+      resetGame();
+      break;
+  }
+}
+
+function beginCountdown(data) {
+  roundId = data.roundId ?? roundId;
+  gamePhase = "countdown";
+
+  countdownEndsAt = Date.now() +
+    (Number.isFinite(Number(data.countdownMs))
+      ? Math.max(0, Number(data.countdownMs))
+      : GAME.countdownMs);
+
+  recoveryEndsAt = 0;
+
+  if (readyOverlay) {
+    readyOverlay.style.display = "none";
+  }
+}
+
+function beginGame(data) {
+  roundId = data.roundId ?? roundId;
+  gamePhase = "playing";
+  gameWinner = null;
+
+  const remaining = Number(data.remainingMs);
+
+  roundEndsAt = Date.now() +
+    (Number.isFinite(remaining)
+      ? Math.max(0, remaining)
+      : GAME.roundMs);
+
+  countdownEndsAt = 0;
+
+  const recovery = Number(data.recoveryRemainingMs);
+
+  recoveryEndsAt =
+    Number.isFinite(recovery) && recovery > 0
+      ? Date.now() + recovery
+      : 0;
+
+  fragments = [];
+  spentFragmentIds.clear();
+
+  totalScoops = 0;
+  totalHits = 0;
+  totalShakes = 0;
+
+  nextFragmentId = 1;
+  lastSendAt = 0;
+
+  previousTiltX = null;
+  previousTiltY = null;
+  previousMotionTime = null;
+  previousAcceleration = null;
+
+  shakeEnergy = 0;
+
+  trackedFingerId = null;
+  fingerHeld = false;
+  touchesWereEmpty = touches.length === 0;
+
+  resetGestureWhenInactive();
+
+  if (readyOverlay) {
+    readyOverlay.style.display = "none";
+  }
+
+  const oldEndScreen = document.getElementById(
+    "disrupt-end-screen"
+  );
+
+  if (oldEndScreen) {
+    oldEndScreen.remove();
+  }
+}
+
+function synchronizeGame(data) {
+  if (
+    data.roundId != null &&
+    roundId != null &&
+    data.roundId !== roundId
+  ) {
+    return;
+  }
+
+  if (gamePhase !== "playing") return;
+
+  const remaining = Number(data.remainingMs);
+
+  if (Number.isFinite(remaining)) {
+    roundEndsAt = Date.now() +
+      Math.max(0, remaining);
+  }
+
+  const recovery = Number(
+    data.recoveryRemainingMs
+  );
+
+  recoveryEndsAt =
+    Number.isFinite(recovery) && recovery > 0
+      ? Date.now() + recovery
+      : 0;
+}
+
+// ========================================
+// COLLISION CONFIRMATION
+// ========================================
+
+function receiveFragmentHit(data) {
+  if (data.participantId !== DISRUPT_ID) {
+    return;
+  }
+
+  if (
+    data.roundId != null &&
+    roundId != null &&
+    data.roundId !== roundId
+  ) {
+    return;
+  }
+
+  const id = Number(data.fragmentId);
+
+  if (!Number.isFinite(id)) return;
+
+  if (!spentFragmentIds.has(id)) {
+    spentFragmentIds.add(id);
+    totalHits++;
+  }
+
+  fragments = fragments.filter(
+    f => f.id !== id
+  );
+
+  emitDisrupt("move", {
+    fragments: getNetworkFragments()
+  });
+}
+
+// ========================================
+// FINISH AND RESET
+// ========================================
+
+function finishGame(data) {
+  if (
+    data.roundId != null &&
+    roundId != null &&
+    data.roundId !== roundId
+  ) {
+    return;
+  }
+
+  gamePhase = "finished";
+  gameWinner = data.winner || null;
+  recoveryEndsAt = 0;
+
+  showEndScreen();
+}
+
+function resetGame() {
+  gamePhase = "lobby";
+  roundId = null;
+  playerReady = false;
+  gameWinner = null;
+
+  roundEndsAt = 0;
+  countdownEndsAt = 0;
+  recoveryEndsAt = 0;
+
+  fragments = [];
+  spentFragmentIds.clear();
+
+  nextFragmentId = 1;
+  totalScoops = 0;
+  totalHits = 0;
+  totalShakes = 0;
+
+  previousTiltX = null;
+  previousTiltY = null;
+  previousMotionTime = null;
+  previousAcceleration = null;
+
+  shakeEnergy = 0;
+  lastSendAt = 0;
+
+  trackedFingerId = null;
+  fingerHeld = false;
+  touchesWereEmpty = touches.length === 0;
+
+  resetGestureWhenInactive();
+
+  if (readyOverlay) {
+    readyOverlay.style.display =
+      motionSensorsAreEnabled() ? "flex" : "none";
+  }
+
+  if (readyButton) {
+    readyButton.disabled = false;
+    readyButton.textContent = "I'm Ready";
+    readyButton.style.background = "#343B4D";
+  }
+
+  if (readyStatus) {
+    readyStatus.textContent =
+      "Waiting for you to get ready.";
+  }
+
+  const endScreen = document.getElementById(
+    "disrupt-end-screen"
+  );
+
+  if (endScreen) {
+    endScreen.remove();
+  }
+}
+
+// ========================================
+// END SCREEN
+// ========================================
+
+function showEndScreen() {
+  const existing = document.getElementById(
+    "disrupt-end-screen"
+  );
+
+  if (existing) existing.remove();
+
+  const createWins = gameWinner === "create";
+
+  const noResult =
+    gameWinner === "none" ||
+    gameWinner === "no-result" ||
+    !gameWinner;
+
+  const heading = noResult
+    ? "Round Complete"
+    : createWins
+      ? "Creation Prevails"
+      : "All Artworks Erased";
+
+  const subtitle = noResult
+    ? "Try another round together."
+    : createWins
+      ? "Creation is vulnerable, but creativity is continuous."
+      : "Keep creating. We never stop.";
+
+  const screen = document.createElement("div");
+
+  screen.id = "disrupt-end-screen";
+
+  screen.style.cssText = `
+    position:fixed;
+    inset:0;
+    z-index:8500;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:rgba(233,234,240,.97);
+    font-family:system-ui,sans-serif;
+    text-align:center;
+    padding:24px;
+    box-sizing:border-box;
+  `;
+
+  screen.innerHTML = `
+    <div style="
+      max-width:370px;
+      color:#343B4D;
+    ">
+      <div style="
+        font-size:11px;
+        letter-spacing:2px;
+        color:#85899A;
+        margin-bottom:30px;
+      ">
+        ROUND COMPLETE
+      </div>
+
+      <div style="
+        font-size:48px;
+        margin-bottom:20px;
+      ">
+        ${createWins ? "✦" : "◇"}
+      </div>
+
+      <h1 style="
+        font-size:32px;
+        font-weight:400;
+        line-height:1.2;
+      ">
+        ${heading}
+      </h1>
+
+      <p style="
+        font-size:14px;
+        color:#74798A;
+        line-height:1.7;
+      ">
+        ${subtitle}
+      </p>
+
+      <p style="
+        font-size:12px;
+        color:#85899A;
+        margin-top:30px;
+      ">
+        Waiting for the next round...
+      </p>
+    </div>
+  `;
+
+  document.body.appendChild(screen);
+}
+
+// ========================================
+// AUDIO
+// ========================================
+
+function unlockGameAudio() {
+  try {
+    const AudioContextClass =
+      window.AudioContext ||
+      window.webkitAudioContext;
+
+    if (!AudioContextClass) return;
+
+    if (!audioContext) {
+      audioContext = new AudioContextClass();
+    }
+
+    if (audioContext.state === "suspended") {
+      audioContext.resume();
+    }
+  } catch (error) {
+    console.warn("Audio unavailable:", error);
+  }
+}
+
+function playScoopTone() {
+  if (!audioContext) return;
+
+  if (audioContext.state !== "running") {
+    audioContext.resume();
+  }
+
+  const now = audioContext.currentTime;
+
+  playSoftNote(392.00, now, 0.17);
+  playSoftNote(493.88, now + 0.09, 0.23);
+}
+
+function playSoftNote(frequency, start, duration) {
+  if (!audioContext) return;
+
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+
+  oscillator.type = "sine";
+
+  oscillator.frequency.setValueAtTime(
+    frequency,
+    start
+  );
+
+  gain.gain.setValueAtTime(0.0001, start);
+
+  gain.gain.exponentialRampToValueAtTime(
+    GAME.soundVolume,
+    start + 0.025
+  );
+
+  gain.gain.exponentialRampToValueAtTime(
+    0.0001,
+    start + duration
+  );
+
+  oscillator.connect(gain);
+  gain.connect(audioContext.destination);
+
+  oscillator.start(start);
+  oscillator.stop(start + duration + 0.02);
 }
 
 // ========================================
 // SCOOP DETECTION
-// Preserved from Player 02 V2C
 // ========================================
+
+function resetGestureWhenInactive() {
+  gesture = null;
+  scoopState = "waiting";
+
+  lastFilteredX = null;
+  lastMotionAt = 0;
+  motionSpeedX = 0;
+}
 
 function updateScoopGesture() {
   const now = performance.now();
@@ -239,11 +1061,7 @@ function updateScoopGesture() {
   if (!Number.isFinite(x)) return;
 
   if (!fingerHeld) {
-    gesture = null;
-    scoopState = "waiting";
-    lastFilteredX = null;
-    lastMotionAt = 0;
-    motionSpeedX = 0;
+    resetGestureWhenInactive();
     return;
   }
 
@@ -294,9 +1112,8 @@ function updateScoopGesture() {
       g.start = now;
       scoopState = "dipped";
     }
-  }
 
-  else if (scoopState === "dipped") {
+  } else if (scoopState === "dipped") {
     g.minX = Math.min(g.minX, filtered);
 
     if (now - g.start > SCOOP.maxMs) {
@@ -304,9 +1121,8 @@ function updateScoopGesture() {
       g.baseline = filtered;
       g.minX = filtered;
       scoopState = "ready";
-    }
 
-    else if (
+    } else if (
       filtered - g.minX >= SCOOP.reversal &&
       now - g.start >= SCOOP.minMs &&
       motionSpeedX > 0.03 &&
@@ -320,9 +1136,8 @@ function updateScoopGesture() {
 
       scoopState = "rearm";
     }
-  }
 
-  else if (scoopState === "rearm") {
+  } else if (scoopState === "rearm") {
     g.reversalPeak = Math.max(
       g.reversalPeak,
       filtered
@@ -346,75 +1161,62 @@ function updateScoopGesture() {
 }
 
 // ========================================
-// CREATE GLASS FRAGMENTS
+// SPAWN FRAGMENTS
 // ========================================
 
 function addScoop() {
+  if (gamePhase !== "playing") return;
+
   totalScoops++;
+  playScoopTone();
 
-  for (
-    let i = 0;
-    i < ART.fragmentsPerScoop;
-    i++
-  ) {
-    fragments.push(createFragment());
-  }
+  fragments.push(createFragment());
 
-  while (
-    fragments.length > ART.maxFragments
-  ) {
+  while (fragments.length > ART.maxFragments) {
     fragments.shift();
   }
 
-  // Notify shared display of new fragments.
   emitDisrupt("spawn", {
     fragments: getNetworkFragments()
   });
 }
 
 function createFragment() {
-  const size = random(
-    ART.minSize,
-    ART.maxSize
-  );
-
-  const margin = size * 0.65;
+  const now = millis();
 
   return {
     id: nextFragmentId++,
 
-    x: random(
-      margin,
-      max(margin, width - margin)
+    x: random(0.38, 0.62),
+    y: random(0.35, 0.65),
+
+    vx: 0,
+    vy: 0,
+
+    speedFactor: random(0.75, 1.3),
+
+    size: random(
+      ART.minSize,
+      ART.maxSize
     ),
 
-    y: random(
-      min(100, height * 0.25),
-      max(101, height - 55)
-    ),
-
-    vx: random(-0.7, 0.7),
-    vy: random(-0.7, 0.7),
-
-    speedFactor: random(0.65, 1.65),
-
-    size,
     rotation: random(TWO_PI),
 
     rotationSpeed: random(
-      -0.008,
-      0.008
+      -0.012,
+      0.012
     ),
 
     color: [...random(PALETTE)],
     shape: floor(random(4)),
-    phase: random(TWO_PI),
-    createdAt: millis()
+
+    createdAt: now,
+    expiresAt: now + ART.lifetimeMs
   };
 }
 
 // ========================================
-// PHONE MOVEMENT
+// TILT MOVEMENT
 // ========================================
 
 function updatePhoneMovement() {
@@ -466,17 +1268,8 @@ function updatePhoneMovement() {
       ? deltaY
       : 0;
 
-  motionX = constrain(
-    cleanX / dt,
-    -8,
-    8
-  );
-
-  motionY = constrain(
-    cleanY / dt,
-    -8,
-    8
-  );
+  motionX = constrain(cleanX / dt, -8, 8);
+  motionY = constrain(cleanY / dt, -8, 8);
 
   motionMagnitude = sqrt(
     motionX * motionX +
@@ -485,40 +1278,37 @@ function updatePhoneMovement() {
 }
 
 // ========================================
-// FREE-FLOATING FRAGMENT PHYSICS
+// FRAGMENT PHYSICS
 // ========================================
 
 function updateFragment(f) {
-  const forceX =
-    motionX *
-    ART.movementStrength *
-    f.speedFactor / 60;
+  const moving =
+    motionMagnitude > ART.movementThreshold;
 
-  const forceY =
-    motionY *
-    ART.movementStrength *
-    f.speedFactor / 60;
+  if (moving) {
+    f.vx +=
+      motionX *
+      ART.movementStrength *
+      f.speedFactor;
 
-  f.vx += forceX;
-  f.vy += forceY;
+    f.vy +=
+      motionY *
+      ART.movementStrength *
+      f.speedFactor;
+  }
 
-  // Independent floating motion.
-  f.vx +=
-    sin(frameCount * 0.012 + f.phase) *
-    0.025;
-
-  f.vy +=
-    cos(frameCount * 0.010 + f.phase) *
-    0.025;
-
-  const damping = 0.995;
+  const damping = moving
+    ? ART.movingFriction
+    : ART.restingFriction;
 
   f.vx *= damping;
   f.vy *= damping;
 
+  if (abs(f.vx) < 0.000025) f.vx = 0;
+  if (abs(f.vy) < 0.000025) f.vy = 0;
+
   const maxV =
-    ART.maxSpeed +
-    shakeEnergy * 5;
+    ART.maxSpeed + shakeEnergy * 0.004;
 
   const speed = sqrt(
     f.vx * f.vx +
@@ -534,74 +1324,42 @@ function updateFragment(f) {
   f.x += f.vx;
   f.y += f.vy;
 
-  f.rotation +=
-    f.rotationSpeed *
-    (1 + speed * 0.2);
+  f.x = constrain(f.x, 0, 1);
+  f.y = constrain(f.y, 0, 1);
 
-  const margin = f.size * 0.55;
+  if (f.x === 0 || f.x === 1) f.vx = 0;
+  if (f.y === 0 || f.y === 1) f.vy = 0;
 
-  const minX = margin;
-  const maxX = max(
-    margin,
-    width - margin
-  );
-
-  const minY = min(90, height * 0.2);
-
-  const maxY = max(
-    minY,
-    height - max(35, height * 0.07)
-  );
-
-  // Soft boundary bounce.
-  if (f.x < minX) {
-    f.x = minX;
-    f.vx = abs(f.vx) * 0.65;
-  }
-
-  if (f.x > maxX) {
-    f.x = maxX;
-    f.vx = -abs(f.vx) * 0.65;
-  }
-
-  if (f.y < minY) {
-    f.y = minY;
-    f.vy = abs(f.vy) * 0.65;
-  }
-
-  if (f.y > maxY) {
-    f.y = maxY;
-    f.vy = -abs(f.vy) * 0.65;
+  if (f.vx !== 0 || f.vy !== 0) {
+    f.rotation += f.rotationSpeed;
   }
 }
 
 // ========================================
-// SHAKE DETECTION
+// SHAKE
 // ========================================
 
 function updateShake() {
   const now = millis();
 
   const ax = Number.isFinite(accelerationX)
-    ? accelerationX : 0;
+    ? accelerationX
+    : 0;
 
   const ay = Number.isFinite(accelerationY)
-    ? accelerationY : 0;
+    ? accelerationY
+    : 0;
 
   const az = Number.isFinite(accelerationZ)
-    ? accelerationZ : 0;
+    ? accelerationZ
+    : 0;
 
   const current = { ax, ay, az };
 
   if (previousAcceleration !== null) {
-    const dx =
-      ax - previousAcceleration.ax;
-
-    const dy =
-      ay - previousAcceleration.ay;
-
-    const dz =
-      az - previousAcceleration.az;
+    const dx = ax - previousAcceleration.ax;
+    const dy = ay - previousAcceleration.ay;
+    const dz = az - previousAcceleration.az;
 
     const change = sqrt(
       dx * dx +
@@ -611,8 +1369,7 @@ function updateShake() {
 
     if (
       change > ART.shakeThreshold &&
-      now - lastShakeAt >
-        ART.shakeCooldown
+      now - lastShakeAt > ART.shakeCooldown
     ) {
       const intensity = constrain(
         map(
@@ -645,9 +1402,7 @@ function triggerShake(intensity) {
   totalShakes++;
 
   const force =
-    intensity *
-    ART.shakeStrength *
-    10;
+    intensity * ART.shakeStrength;
 
   for (const f of fragments) {
     f.vx +=
@@ -659,7 +1414,6 @@ function triggerShake(intensity) {
       f.speedFactor;
   }
 
-  // Send shake intensity and fragment positions.
   emitDisrupt("shake", {
     intensity,
     fragments: getNetworkFragments()
@@ -667,54 +1421,61 @@ function triggerShake(intensity) {
 }
 
 // ========================================
-// SHARED DISPLAY MESSAGES
+// SEND TO SHARED DISPLAY
 // ========================================
 
-// Send only when connected.
 function emitDisrupt(action, extra = {}) {
   if (
-    typeof shareConnected === "undefined" ||
-    !shareConnected
+    typeof shareEmit !== "function" ||
+    gamePhase !== "playing"
   ) {
     return;
   }
 
   shareEmit("disrupt", {
     player: 2,
-    mode: DISRUPT_MODE,
+    mode: "disrupt",
     participantId: DISRUPT_ID,
+    roundId,
     action,
     ...extra
   });
 }
 
-// Convert positions and sizes into values
-// independent of phone screen dimensions.
 function getNetworkFragments() {
-  const shortest = Math.min(width, height);
+  const now = millis();
 
   return fragments.map(f => ({
     id: f.id,
-    x: f.x / width,
-    y: f.y / height,
-    size: f.size / shortest,
+    x: f.x,
+    y: f.y,
+
+    size:
+      f.size / Math.min(width, height),
+
     rotation: f.rotation,
     color: f.color,
-    shape: f.shape
+    shape: f.shape,
+
+    remainingMs: Math.max(
+      0,
+      f.expiresAt - now
+    )
   }));
 }
 
-// Send positions during movement.
-// The display can use these positions to
-// draw fragments and detect artwork collisions.
-function sendFragmentPositions() {
-  if (fragments.length === 0) {
-    return;
-  }
-
+function sendFragmentPositions(force = false) {
   const now = performance.now();
 
-  if (now - lastSendAt < SEND_INTERVAL) {
+  const interval =
+    fragments.length > 0
+      ? SEND_INTERVAL
+      : 500;
+
+  if (
+    !force &&
+    now - lastSendAt < interval
+  ) {
     return;
   }
 
@@ -722,6 +1483,7 @@ function sendFragmentPositions() {
 
   emitDisrupt("move", {
     fragments: getNetworkFragments(),
+
     motion: {
       x: motionX,
       y: motionY,
@@ -735,96 +1497,81 @@ function sendFragmentPositions() {
 // ========================================
 
 function drawFragment(f) {
+  const now = millis();
+
   const appear = constrain(
-    (millis() - f.createdAt) /
-      ART.appearMs,
+    (now - f.createdAt) / ART.appearMs,
     0,
     1
   );
 
+  const remaining = Math.max(
+    0,
+    f.expiresAt - now
+  );
+
+  const fadeOut = constrain(
+    remaining / ART.fadeOutMs,
+    0,
+    1
+  );
+
+  const opacity = appear * fadeOut;
+
+  const x = f.x * width;
+  const y = f.y * height;
+
   push();
 
-  translate(f.x, f.y);
+  translate(x, y);
   rotate(f.rotation);
 
-  const breathing =
-    1 +
-    sin(
-      frameCount * ART.breathingSpeed +
-      f.phase
-    ) *
-    ART.breathingAmount;
-
-  scale(breathing);
-
   const c = f.color;
-  const s = f.size;
-
-  // Soft pastel shadow.
-  noStroke();
+  const s = f.size * 0.65;
 
   fill(
     c[0],
     c[1],
     c[2],
-    18 * appear
-  );
-
-  ellipse(
-    3,
-    5,
-    s * 1.1,
-    s * 0.75
-  );
-
-  // Translucent glass.
-  fill(
-    c[0],
-    c[1],
-    c[2],
-    165 * appear
+    165 * opacity
   );
 
   stroke(
     min(255, c[0] + 25),
     min(255, c[1] + 25),
     min(255, c[2] + 25),
-    180 * appear
+    180 * opacity
   );
 
-  strokeWeight(1);
+  strokeWeight(0.8);
 
   if (f.shape === 0) {
     rectMode(CENTER);
-    rect(0, 0, s, s * 0.46, 3);
-  }
+    rect(0, 0, s, s * 0.46);
 
-  else if (f.shape === 1) {
+  } else if (f.shape === 1) {
     beginShape();
+
     vertex(-s * 0.5, -s * 0.25);
     vertex(s * 0.25, -s * 0.4);
     vertex(s * 0.5, s * 0.2);
     vertex(-s * 0.2, s * 0.35);
+
     endShape(CLOSE);
-  }
 
-  else if (f.shape === 2) {
+  } else if (f.shape === 2) {
     triangle(
-      -s * 0.45, s * 0.3,
-      0, -s * 0.45,
-      s * 0.5, s * 0.25
-    );
-  }
-
-  else {
-    rectMode(CENTER);
-    rect(
+      -s * 0.45,
+      s * 0.3,
       0,
-      0,
+      -s * 0.45,
       s * 0.5,
-      s * 0.9,
-      5
+      s * 0.25
     );
+
+  } else {
+    rectMode(CENTER);
+    rect(0, 0, s * 0.5, s * 0.9);
   }
 
   pop();
@@ -842,16 +1589,11 @@ function updateFinger() {
       trackedFingerId = touches[0].id;
       fingerHeld = true;
     }
-  }
 
-  else {
+  } else {
     let stillDown = false;
 
-    for (
-      let i = 0;
-      i < touches.length;
-      i++
-    ) {
+    for (let i = 0; i < touches.length; i++) {
       if (touches[i].id === trackedFingerId) {
         stillDown = true;
         break;
@@ -861,11 +1603,7 @@ function updateFinger() {
     if (!stillDown) {
       trackedFingerId = null;
       fingerHeld = false;
-      scoopState = "waiting";
-      gesture = null;
-      lastFilteredX = null;
-      lastMotionAt = 0;
-      motionSpeedX = 0;
+      resetGestureWhenInactive();
     }
   }
 
@@ -890,7 +1628,6 @@ function mouseReleased() {
 function drawDebug() {
   noStroke();
   fill(85, 92, 110);
-
   textSize(12);
   textAlign(LEFT, TOP);
 
@@ -905,22 +1642,16 @@ function drawDebug() {
   const top = 100;
 
   text("DISRUPT / V2C", 24, 55);
-
   text("rotationX " + x, 24, top);
   text("rotationY " + y, 24, top + 18);
 
   text(
-    "finger " +
-      (fingerHeld ? "down" : "up"),
+    "finger " + (fingerHeld ? "down" : "up"),
     24,
     top + 36
   );
 
-  text(
-    "state " + scoopState,
-    24,
-    top + 54
-  );
+  text("state " + scoopState, 24, top + 54);
 
   text(
     "successful scoops " + totalScoops,
@@ -929,24 +1660,19 @@ function drawDebug() {
   );
 
   text(
-    "floating fragments " +
-      fragments.length,
+    "active fragments " + fragments.length,
     24,
     top + 90
   );
 
   text(
-    "movement " +
-      motionMagnitude.toFixed(2),
+    "movement " + motionMagnitude.toFixed(2),
     24,
     top + 108
   );
 
-  text(
-    "shakes " + totalShakes,
-    24,
-    top + 126
-  );
+  text("shakes " + totalShakes, 24, top + 126);
+  text("artworks hit " + totalHits, 24, top + 144);
 
   const connected =
     typeof shareConnected !== "undefined" &&
@@ -957,25 +1683,24 @@ function drawDebug() {
       ? "Shared display: connected"
       : "Shared display: waiting",
     24,
-    top + 144
+    top + 162
   );
 
   textAlign(CENTER, CENTER);
 }
 
 // ========================================
-// INSTRUCTIONS
+// GAME INSTRUCTIONS
 // ========================================
 
 function drawInstructions() {
   noStroke();
   fill(105, 110, 125);
-
   textSize(12);
   textAlign(CENTER, CENTER);
 
   text(
-    "Scoop to release · Tilt to guide · Shake to scatter",
+    "Scoop · Tilt to chase · Shake to scatter",
     width / 2,
     height - 35
   );
@@ -986,20 +1711,6 @@ function drawInstructions() {
 // ========================================
 
 function windowResized() {
-  const oldW = width;
-  const oldH = height;
-
   resizeCanvas(windowWidth, windowHeight);
-
-  for (const f of fragments) {
-    f.x *= width / oldW;
-    f.y *= height / oldH;
-  }
-
-  if (sensorButton) {
-    sensorButton.position(
-      width / 2 - 100,
-      height / 2 - 25
-    );
-  }
+  positionSensorButton();
 }
