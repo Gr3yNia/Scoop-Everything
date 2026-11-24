@@ -330,86 +330,40 @@ h1 {
 }
 
 /* ======================================
-   TWO INSTRUCTION BOXES
+   ONE SHARED SCOOP GUIDE — LOBBY
 ====================================== */
 
 .instructions {
   position: absolute;
-
   bottom: 68px;
   right: 5%;
-
   width: 48%;
   z-index: 9;
-
-  display: grid;
-  grid-template-columns:
-    repeat(2,minmax(0,1fr));
-
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
 }
 
-.instruction-box {
-  padding: 18px 20px;
-
-  background:
-    rgba(255,255,255,.65);
-
-  border:
-    1px solid rgba(255,255,255,.75);
-
+.scoop-guide {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.75);
   border-radius: 15px;
-
-  backdrop-filter: blur(8px);
+  background: rgba(255,255,255,.55);
+  box-shadow: 0 8px 35px rgba(52,59,77,.04);
 }
 
-.instruction-title {
-  font-size: 12px;
-  letter-spacing: .13em;
-
-  margin-bottom: 10px;
-}
-
-.instruction-box p {
-  font-size: 11px;
-  line-height: 1.65;
-
-  color: #73798A;
-
-  margin: 0;
-}
-
-.instruction-box p + p {
-  margin-top: 7px;
-}
-
-.instruction-box b {
-  color: var(--ink);
-  font-weight: 600;
-}
-
-.challenge-note {
-  grid-column: 1 / -1;
-
-  font-size: 11px;
-  line-height: 1.6;
-
-  text-align: center;
-  color: #777E90;
-
-  padding: 4px 12px;
-}
-
-.challenge-note strong {
-  color: var(--ink);
+.scoop-guide img {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
 }
 
 .lobby-status {
-  grid-column: 1 / -1;
-
   text-align: center;
   font-size: 11px;
-
   color: #74798A;
   min-height: 16px;
 }
@@ -603,6 +557,80 @@ h1 {
 }
 
 /* ======================================
+   ROUND BRIEFING (BETWEEN ROUNDS)
+====================================== */
+
+.briefing-overlay {
+  position: absolute;
+  inset: 0;
+
+  z-index: 45;
+
+  display: none;
+  align-items: center;
+  justify-content: center;
+
+  flex-direction: column;
+
+  padding: 30px;
+  text-align: center;
+
+  background:
+    rgba(233,234,240,.94);
+
+  backdrop-filter: blur(8px);
+}
+
+.briefing-eyebrow {
+  font-size: 11px;
+  letter-spacing: .3em;
+
+  color: #74798A;
+
+  margin-bottom: 16px;
+}
+
+.briefing-title {
+  font-size:
+    clamp(34px,5vw,72px);
+
+  font-weight: 200;
+  letter-spacing: -.03em;
+
+  margin: 0 0 34px;
+}
+
+.briefing-roles {
+  max-width: 640px;
+}
+
+.briefing-role {
+  margin-bottom: 22px;
+}
+
+.briefing-role:last-child {
+  margin-bottom: 0;
+}
+
+.briefing-role strong {
+  display: block;
+
+  font-size: 12px;
+  letter-spacing: .18em;
+
+  margin-bottom: 8px;
+}
+
+.briefing-role p {
+  font-size: 13px;
+  line-height: 1.7;
+
+  color: #73798A;
+
+  margin: 0;
+}
+
+/* ======================================
    WINNER SCREEN
 ====================================== */
 
@@ -722,13 +750,6 @@ body.playing .exhibition {
     bottom: 55px;
   }
 
-  .instruction-box {
-    padding: 13px;
-  }
-
-  .instruction-box p {
-    font-size: 10px;
-  }
 }
 
 @media (max-width: 750px) {
@@ -955,73 +976,20 @@ body.playing .exhibition {
 
   </div>
 
-  <!-- TWO INSTRUCTION BOXES -->
+  <!-- SHARED SCOOP INSTRUCTION GUIDE (BOTH ROLES) -->
 
   <div class="instructions">
-
-    <div class="instruction-box">
-
-      <div class="instruction-title">
-        CREATE
-      </div>
-
-      <p>
-        Hold your finger and scoop
-        to create artwork.
-      </p>
-
-      <p>
-        Keep creating as DISRUPT
-        erases your art.
-      </p>
-
-      <p>
-        If no artworks remain,
-        you have <b>5 seconds</b>
-        to create another!
-      </p>
-
+    <div class="scoop-guide">
+      <img
+        src="./assets/Instructional-Guide-1.png"
+        alt="Three-step scoop gesture: hold the phone horizontally with a finger on the screen, scoop downward, then lift the phone back up without releasing your finger."
+        draggable="false"
+      >
     </div>
 
-    <div class="instruction-box">
-
-      <div class="instruction-title">
-        DISRUPT
-      </div>
-
-      <p>
-        Hold your finger and scoop
-        to release glass fragments.
-      </p>
-
-      <p>
-        Tilt your phone to hit
-        and erase artworks.
-      </p>
-
-      <p>
-        Each fragment disappears
-        after <b>10 seconds</b>.
-        Stop CREATE from recovering!
-      </p>
-
-    </div>
-
-    <div class="challenge-note">
-      <strong>30-second challenge:</strong>
-      CREATE wins if artwork survives.
-      DISRUPT wins if CREATE fails
-      to make new artwork within
-      the 5-second recovery period.
-    </div>
-
-    <div
-      class="lobby-status"
-      id="lobbyStatus"
-    >
+    <div class="lobby-status" id="lobbyStatus">
       Scan a QR code to join.
     </div>
-
   </div>
 
   <!-- LIVE EXHIBITION -->
@@ -1081,6 +1049,50 @@ body.playing .exhibition {
     </button>
 
   </section>
+
+  <!-- ROUND BRIEFING (ROUND 1 -> ROUND 2) -->
+
+  <div
+    class="briefing-overlay"
+    id="briefingOverlay"
+  >
+
+    <div class="briefing-eyebrow">
+      ROUND 1 IS COMPLETE
+    </div>
+
+    <div
+      class="briefing-title"
+      id="briefingTitle"
+    >
+      ROUND 2 · COMPETE
+    </div>
+
+    <div class="briefing-roles">
+
+      <div class="briefing-role">
+        <strong>CREATE</strong>
+        <p>
+          Keep the artwork alive — scoop to
+          replace destroyed artworks. If all
+          artworks disappear, you have
+          5 seconds to create another.
+        </p>
+      </div>
+
+      <div class="briefing-role">
+        <strong>DISRUPT</strong>
+        <p>
+          Destroy the artwork — scoop to
+          release one fragment, then tilt to
+          hit artworks. Each fragment lasts
+          10 seconds.
+        </p>
+      </div>
+
+    </div>
+
+  </div>
 
   <!-- MAIN COUNTDOWN -->
 
@@ -1217,6 +1229,9 @@ const GAME = {
   roundMs: 30000,
   recoveryMs: 5000,
   countdownMs: 3000,
+
+  // Shown between Round 1 and Round 2, before the countdown starts.
+  briefingMs: 5000,
 
   stateSendMs: 250,
 
@@ -1366,6 +1381,16 @@ const countdownCaption =
     "countdownCaption"
   );
 
+const briefingOverlay =
+  document.getElementById(
+    "briefingOverlay"
+  );
+
+const briefingTitle =
+  document.getElementById(
+    "briefingTitle"
+  );
+
 const endOverlay =
   document.getElementById(
     "endOverlay"
@@ -1424,6 +1449,9 @@ let roundId = null;
 // 1 = Discover (practice), 2 = Compete. The display is the authority for
 // which round is running; both phones follow the roundNumber it sends.
 let currentRound = 1;
+
+// Handles the five-second Round 2 briefing between the rounds.
+let briefingTimer = null;
 
 let countdownEndsAt = 0;
 let roundEndsAt = 0;
@@ -1650,6 +1678,9 @@ function startCountdown() {
 
   countdownOverlay.style.display =
     "flex";
+
+  briefingOverlay.style.display =
+    "none";
 
   endOverlay.style.display =
     "none";
@@ -2734,15 +2765,50 @@ function advanceRound() {
   currentRound = 2;
 
   // Fades the black veil back out to the original light-grey
-  // background while the countdown is still on screen.
+  // background while the briefing is still on screen.
   applyRoundTheme();
 
-  // startCountdown() clears the Round 1 artworks and fragments, mints a
-  // fresh roundId and runs the existing three-second countdown, which
-  // emits game-countdown and then game-start. Both phones already reset
-  // their local state on those events, so the transition stays in sync
-  // with no new event type and no second game loop.
-  startCountdown();
+  // Round 1's artworks and fragments have to go now, not five seconds
+  // from now when the countdown starts.
+  clearRoundArtwork();
+
+  showRoundBriefing();
+}
+
+// Five-second briefing that states Round 2's objectives before the
+// existing three-second countdown runs. The display owns this timer and
+// the phones hide their panels when game-countdown arrives, so both
+// sides stay on one clock with no drift.
+function showRoundBriefing() {
+  gamePhase = "briefing";
+
+  briefingTitle.textContent =
+    ROUNDS[currentRound].label;
+
+  briefingOverlay.style.display =
+    "flex";
+
+  emitGame("round-briefing", {
+    roundId,
+
+    roundNumber: currentRound,
+
+    briefingMs: GAME.briefingMs
+  });
+
+  briefingTimer = setTimeout(() => {
+    briefingTimer = null;
+
+    // A Reset during the briefing must not start a countdown.
+    if (gamePhase !== "briefing") {
+      return;
+    }
+
+    briefingOverlay.style.display =
+      "none";
+
+    startCountdown();
+  }, GAME.briefingMs);
 }
 
 // ========================================
@@ -2794,6 +2860,15 @@ function resetGame() {
   document.body.classList.remove(
     "playing"
   );
+
+  // A Reset during the briefing must cancel the pending countdown.
+  if (briefingTimer !== null) {
+    clearTimeout(briefingTimer);
+    briefingTimer = null;
+  }
+
+  briefingOverlay.style.display =
+    "none";
 
   countdownOverlay.style.display =
     "none";

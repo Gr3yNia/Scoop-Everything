@@ -136,6 +136,7 @@ let readyOverlay;
 let readyButton;
 let readyStatus;
 let gameOverlay;
+let briefingOverlay;
 
 let trackedFingerId = null;
 let fingerHeld = false;
@@ -235,6 +236,7 @@ function setup() {
 
   setupReadyScreen();
   setupGameOverlay();
+  setupBriefingScreen();
 
   textAlign(CENTER, CENTER);
 }
@@ -421,51 +423,31 @@ function setupReadyScreen() {
         color:#74798A;
         margin:0 0 24px;
       ">
-        Your role is to erase the artwork.
+        Practice scooping to release glass fragments and tilting your phone to move them.
       </p>
 
       <div style="
-        background:white;
-        border-radius:16px;
-        padding:20px;
-        text-align:left;
-        font-size:13px;
-        line-height:1.8;
-        margin-bottom:22px;
+        font-size:11px;
+        letter-spacing:2px;
+        color:#85899A;
+        margin-bottom:12px;
       ">
-
-        <div style="margin-bottom:10px">
-          <b>01.</b>
-          Hold your finger on the screen.
-        </div>
-
-        <div style="margin-bottom:10px">
-          <b>02.</b>
-          Scoop your phone to release
-          one glass fragment.
-        </div>
-
-        <div style="margin-bottom:10px">
-          <b>03.</b>
-          Tilt to chase artworks.
-          Shake to scatter fragments.
-        </div>
-
-        <div style="margin-bottom:10px">
-          <b>04.</b>
-          Each fragment disappears
-          after <b>10 seconds</b>.
-        </div>
-
-        <div>
-          <b>05.</b>
-          Erase every artwork.
-          If CREATE cannot recover
-          within <b>5 seconds</b>,
-          you win!
-        </div>
-
+        ROUND 1 · DISCOVER
       </div>
+
+      <img
+        src="./assets/Instructional-Guide-1.png"
+        alt="Three-step scoop gesture: hold the phone with a finger on the screen, scoop downward, then lift the phone back up without releasing your finger."
+        draggable="false"
+        style="
+          display:block;
+          width:100%;
+          height:auto;
+          border-radius:14px;
+          background:white;
+          margin-bottom:22px;
+        "
+      >
 
       <p style="
         font-size:12px;
@@ -550,6 +532,79 @@ function sendReady() {
 }
 
 // ========================================
+// ROUND 2 BRIEFING
+// ========================================
+
+// Shown in the gap between Round 1 and Round 2. The display owns the
+// five-second timer: this panel appears on round-briefing and is
+// dismissed by the existing game-countdown event, so the phones never
+// run a clock of their own and cannot drift from the display.
+function setupBriefingScreen() {
+  briefingOverlay = document.createElement("div");
+
+  briefingOverlay.style.cssText = `
+    position:fixed;
+    inset:0;
+    z-index:8500;
+    background:#E9EAF0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    box-sizing:border-box;
+    font-family:system-ui,sans-serif;
+    color:#343B4D;
+    text-align:center;
+  `;
+
+  briefingOverlay.innerHTML = `
+    <div style="
+      width:100%;
+      max-width:390px;
+      background:#F8F8FA;
+      border-radius:24px;
+      padding:30px 24px;
+      box-sizing:border-box;
+    ">
+
+      <div style="
+        font-size:11px;
+        letter-spacing:2px;
+        color:#85899A;
+        margin-bottom:14px;
+      ">
+        ROUND 1 IS COMPLETE
+      </div>
+
+      <h1 style="
+        font-size:27px;
+        font-weight:400;
+        margin:0 0 22px;
+      ">
+        ROUND 2 · COMPETE
+      </h1>
+
+      <div style="
+        background:white;
+        border-radius:16px;
+        padding:18px;
+        text-align:left;
+        font-size:13px;
+        line-height:1.75;
+      ">
+        <b>DISRUPT</b> — Find and destroy! Scoop
+        to release one fragment, then tilt to
+        hit artworks. Each fragment lasts
+        10 seconds.
+      </div>
+
+    </div>
+  `;
+
+  document.body.appendChild(briefingOverlay);
+}
+
+// ========================================
 // GAME HUD
 // ========================================
 
@@ -584,7 +639,8 @@ function updateGameOverlay() {
   if (
     gamePhase === "lobby" ||
     gamePhase === "waiting" ||
-    gamePhase === "finished"
+    gamePhase === "finished" ||
+    gamePhase === "briefing"
   ) {
     gameOverlay.style.display = "none";
     return;
@@ -711,6 +767,10 @@ function shareEvent(name, data, from) {
   if (!data) return;
 
   switch (name) {
+    case "round-briefing":
+      beginBriefing(data);
+      break;
+
     case "game-countdown":
       beginCountdown(data);
       break;
@@ -737,6 +797,36 @@ function shareEvent(name, data, from) {
   }
 }
 
+// The display runs a five-second briefing between the rounds. Show this
+// role's objectives and wait: game-countdown is what dismisses it.
+function beginBriefing(data) {
+  if (
+    data.roundId != null &&
+    roundId != null &&
+    data.roundId !== roundId
+  ) {
+    return;
+  }
+
+  roundId = data.roundId ?? roundId;
+
+  applyRoundTheme(data.roundNumber);
+
+  gamePhase = "briefing";
+
+  if (readyOverlay) {
+    readyOverlay.style.display = "none";
+  }
+
+  if (gameOverlay) {
+    gameOverlay.style.display = "none";
+  }
+
+  if (briefingOverlay) {
+    briefingOverlay.style.display = "flex";
+  }
+}
+
 function beginCountdown(data) {
   roundId = data.roundId ?? roundId;
 
@@ -758,6 +848,11 @@ function beginCountdown(data) {
 
   if (readyOverlay) {
     readyOverlay.style.display = "none";
+  }
+
+  // Dismisses the Round 2 briefing.
+  if (briefingOverlay) {
+    briefingOverlay.style.display = "none";
   }
 }
 
@@ -949,6 +1044,10 @@ function resetGame() {
   touchesWereEmpty = touches.length === 0;
 
   resetGestureWhenInactive();
+
+  if (briefingOverlay) {
+    briefingOverlay.style.display = "none";
+  }
 
   if (readyOverlay) {
     readyOverlay.style.display =

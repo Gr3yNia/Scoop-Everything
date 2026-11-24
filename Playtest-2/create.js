@@ -155,6 +155,7 @@ let readyOverlay;
 let readyButton;
 let readyStatus;
 let gameOverlay;
+let briefingOverlay;
 
 let audioContext = null;
 
@@ -212,6 +213,7 @@ function setup() {
 
   setupReadyScreen();
   setupGameOverlay();
+  setupBriefingScreen();
   setupResearchPanel();
 
   textAlign(CENTER, CENTER);
@@ -368,48 +370,38 @@ function setupReadyScreen() {
         color:#74798A;
         margin-bottom:25px;
       ">
-        Your role is to keep the artwork alive.
+        Practice scooping to create artwork.
       </p>
 
       <div style="
-        background:white;
-        border-radius:16px;
-        padding:20px;
-        text-align:left;
-        font-size:13px;
-        line-height:1.8;
-        margin-bottom:24px;
+        font-size:11px;
+        letter-spacing:2px;
+        color:#85899A;
+        margin-bottom:12px;
       ">
-        <div>
-          <b>01.</b>
-          Hold your finger on the screen.
-        </div>
-
-        <div>
-          <b>02.</b>
-          Scoop your phone to create artwork.
-        </div>
-
-        <div>
-          <b>03.</b>
-          Keep creating as DISRUPT
-          erases your art.
-        </div>
-
-        <div>
-          <b>04.</b>
-          If no artworks remain,
-          you have <b>5 seconds</b>
-          to create another.
-        </div>
+        ROUND 1 · DISCOVER
       </div>
+
+      <img
+        src="./assets/Instructional-Guide-1.png"
+        alt="Three-step scoop gesture: hold the phone with a finger on the screen, scoop downward, then lift the phone back up without releasing your finger."
+        draggable="false"
+        style="
+          display:block;
+          width:100%;
+          height:auto;
+          border-radius:14px;
+          background:white;
+          margin-bottom:22px;
+        "
+      >
 
       <p style="
         font-size:12px;
         color:#74798A;
         margin-bottom:18px;
       ">
-        Survive the 30-second round to win.
+        You have 30 seconds to create.
       </p>
 
       <button id="create-ready-button" style="
@@ -485,6 +477,79 @@ function sendReady() {
 }
 
 // ========================================
+// ROUND 2 BRIEFING
+// ========================================
+
+// Shown in the gap between Round 1 and Round 2. The display owns the
+// five-second timer: this panel appears on round-briefing and is
+// dismissed by the existing game-countdown event, so the phones never
+// run a clock of their own and cannot drift from the display.
+function setupBriefingScreen() {
+  briefingOverlay = document.createElement("div");
+
+  briefingOverlay.style.cssText = `
+    position:fixed;
+    inset:0;
+    z-index:8500;
+    background:#E9EAF0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    box-sizing:border-box;
+    font-family:system-ui,sans-serif;
+    color:#343B4D;
+    text-align:center;
+  `;
+
+  briefingOverlay.innerHTML = `
+    <div style="
+      width:100%;
+      max-width:390px;
+      background:#F8F8FA;
+      border-radius:24px;
+      padding:30px 24px;
+      box-sizing:border-box;
+    ">
+
+      <div style="
+        font-size:11px;
+        letter-spacing:2px;
+        color:#85899A;
+        margin-bottom:14px;
+      ">
+        ROUND 1 IS COMPLETE
+      </div>
+
+      <h1 style="
+        font-size:27px;
+        font-weight:400;
+        margin:0 0 22px;
+      ">
+        ROUND 2 · COMPETE
+      </h1>
+
+      <div style="
+        background:white;
+        border-radius:16px;
+        padding:18px;
+        text-align:left;
+        font-size:13px;
+        line-height:1.75;
+      ">
+        <b>CREATE</b> — Keep creating! Scoop to
+        replace destroyed artworks. If all
+        artworks disappear, you have
+        5 seconds to create another.
+      </div>
+
+    </div>
+  `;
+
+  document.body.appendChild(briefingOverlay);
+}
+
+// ========================================
 // GAME OVERLAY
 // ========================================
 
@@ -516,7 +581,8 @@ function updateGameOverlay() {
 
   if (
     gamePhase === "lobby" ||
-    gamePhase === "waiting"
+    gamePhase === "waiting" ||
+    gamePhase === "briefing"
   ) {
     gameOverlay.style.display = "none";
     return;
@@ -651,6 +717,11 @@ function applyRoundTheme(roundNumber) {
 function shareEvent(name, data, from) {
   if (!data) return;
 
+  if (name === "round-briefing") {
+    beginBriefing(data);
+    return;
+  }
+
   if (name === "game-countdown") {
     beginCountdown(data);
     return;
@@ -681,6 +752,36 @@ function shareEvent(name, data, from) {
   }
 }
 
+// The display runs a five-second briefing between the rounds. Show this
+// role's objectives and wait: game-countdown is what dismisses it.
+function beginBriefing(data) {
+  if (
+    data.roundId != null &&
+    roundId != null &&
+    data.roundId !== roundId
+  ) {
+    return;
+  }
+
+  roundId = data.roundId ?? roundId;
+
+  applyRoundTheme(data.roundNumber);
+
+  gamePhase = "briefing";
+
+  if (readyOverlay) {
+    readyOverlay.style.display = "none";
+  }
+
+  if (gameOverlay) {
+    gameOverlay.style.display = "none";
+  }
+
+  if (briefingOverlay) {
+    briefingOverlay.style.display = "flex";
+  }
+}
+
 function beginCountdown(data) {
   roundId = data.roundId ?? roundId;
 
@@ -699,6 +800,11 @@ function beginCountdown(data) {
 
   if (readyOverlay) {
     readyOverlay.style.display = "none";
+  }
+
+  // Dismisses the Round 2 briefing.
+  if (briefingOverlay) {
+    briefingOverlay.style.display = "none";
   }
 }
 
@@ -861,6 +967,10 @@ function resetGame() {
   touchesWereEmpty = touches.length === 0;
 
   resetGestureWhenInactive();
+
+  if (briefingOverlay) {
+    briefingOverlay.style.display = "none";
+  }
 
   if (readyOverlay) {
     readyOverlay.style.display = "flex";
