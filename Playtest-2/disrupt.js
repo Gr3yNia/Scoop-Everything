@@ -364,6 +364,7 @@ function setupReadyScreen() {
   readyOverlay = document.createElement("div");
 
   readyOverlay.id = "disrupt-ready-overlay";
+  readyOverlay.className = "ready-overlay";
 
   readyOverlay.style.cssText = `
     position:fixed;
@@ -381,8 +382,30 @@ function setupReadyScreen() {
     overflow-y:auto;
   `;
 
+  // Scoop Everything is played holding the phone sideways, where there
+  // are only ~375-390px of height. These rules tighten the ready screen
+  // so the image and the I'm Ready button both fit without scrolling.
+  // Portrait (max-height > 480px) and the Round 2 briefing are untouched.
+  const readyStyle = document.createElement("style");
+  readyStyle.textContent = `
+    @media (max-height: 480px) {
+      .ready-overlay { padding: 6px !important; }
+      .ready-card { max-width: 430px !important; padding: 12px 16px !important; }
+      .ready-eyebrow { font-size: 10px !important; margin-bottom: 5px !important; }
+      .ready-symbol { display: none !important; }
+      .ready-title { font-size: 21px !important; margin-bottom: 5px !important; }
+      .ready-subtitle { font-size: 12px !important; line-height: 1.45 !important; margin-bottom: 6px !important; }
+      .ready-heading { font-size: 10px !important; margin-bottom: 5px !important; }
+      .ready-guide { max-height: 118px !important; object-fit: contain !important; margin-bottom: 7px !important; }
+      .ready-duration { font-size: 11px !important; margin-bottom: 7px !important; }
+      .ready-button { padding: 11px !important; font-size: 13px !important; }
+      .ready-status { font-size: 11px !important; margin-top: 7px !important; }
+    }
+  `;
+  document.head.appendChild(readyStyle);
+
   readyOverlay.innerHTML = `
-    <div style="
+    <div class="ready-card" style="
       width:100%;
       max-width:390px;
       margin:auto;
@@ -392,7 +415,7 @@ function setupReadyScreen() {
       box-sizing:border-box;
     ">
 
-      <div style="
+      <div class="ready-eyebrow" style="
         font-size:10px;
         letter-spacing:2px;
         color:#85899A;
@@ -401,7 +424,7 @@ function setupReadyScreen() {
         SCOOP EVERYTHING / V2C
       </div>
 
-      <div style="
+      <div class="ready-symbol" style="
         font-size:38px;
         line-height:1.2;
         margin-bottom:12px;
@@ -409,7 +432,7 @@ function setupReadyScreen() {
         ◇
       </div>
 
-      <h1 style="
+      <h1 class="ready-title" style="
         font-size:30px;
         font-weight:400;
         margin:0 0 10px;
@@ -417,7 +440,7 @@ function setupReadyScreen() {
         DISRUPT
       </h1>
 
-      <p style="
+      <p class="ready-subtitle" style="
         font-size:13px;
         line-height:1.7;
         color:#74798A;
@@ -426,7 +449,7 @@ function setupReadyScreen() {
         Practice scooping to release glass fragments and tilting your phone to move them.
       </p>
 
-      <div style="
+      <div class="ready-heading" style="
         font-size:11px;
         letter-spacing:2px;
         color:#85899A;
@@ -436,6 +459,7 @@ function setupReadyScreen() {
       </div>
 
       <img
+        class="ready-guide"
         src="./assets/Instructional-Guide-1.png"
         alt="Three-step scoop gesture: hold the phone with a finger on the screen, scoop downward, then lift the phone back up without releasing your finger."
         draggable="false"
@@ -449,7 +473,7 @@ function setupReadyScreen() {
         "
       >
 
-      <p style="
+      <p class="ready-duration" style="
         font-size:12px;
         color:#74798A;
         margin:0 0 18px;
@@ -458,6 +482,7 @@ function setupReadyScreen() {
       </p>
 
       <button
+        class="ready-button"
         id="disrupt-ready-button"
         style="
           width:100%;
@@ -474,6 +499,7 @@ function setupReadyScreen() {
       </button>
 
       <p
+        class="ready-status"
         id="disrupt-ready-status"
         style="
           font-size:12px;
@@ -550,7 +576,8 @@ function setupBriefingScreen() {
     display:none;
     align-items:center;
     justify-content:center;
-    padding:24px;
+    overflow-y:auto;
+    padding:16px;
     box-sizing:border-box;
     font-family:system-ui,sans-serif;
     color:#343B4D;
@@ -560,10 +587,11 @@ function setupBriefingScreen() {
   briefingOverlay.innerHTML = `
     <div style="
       width:100%;
-      max-width:390px;
+      max-width:420px;
+      margin:auto;
       background:#F8F8FA;
       border-radius:24px;
-      padding:30px 24px;
+      padding:22px 20px;
       box-sizing:border-box;
     ">
 
@@ -571,26 +599,42 @@ function setupBriefingScreen() {
         font-size:11px;
         letter-spacing:2px;
         color:#85899A;
-        margin-bottom:14px;
+        margin-bottom:10px;
       ">
         ROUND 1 IS COMPLETE
       </div>
 
       <h1 style="
-        font-size:27px;
+        font-size:25px;
         font-weight:400;
-        margin:0 0 22px;
+        margin:0 0 14px;
       ">
         ROUND 2 · COMPETE
       </h1>
 
+      <img
+        src="./assets/Instructional-Guide-Disrupt.png"
+        alt="Three-step DISRUPT guide: scoop to release one fragment, tilt the phone to move it, then guide it into an artwork to destroy it."
+        draggable="false"
+        style="
+          display:block;
+          width:100%;
+          height:auto;
+          max-height:30vh;
+          object-fit:contain;
+          border-radius:12px;
+          background:white;
+          margin-bottom:14px;
+        "
+      >
+
       <div style="
         background:white;
         border-radius:16px;
-        padding:18px;
+        padding:14px 16px;
         text-align:left;
         font-size:13px;
-        line-height:1.75;
+        line-height:1.65;
       ">
         <b>DISRUPT</b> — Find and destroy! Scoop
         to release one fragment, then tilt to

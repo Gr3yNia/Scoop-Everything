@@ -115,18 +115,8 @@ body.round-discover .countdown-caption {
    LANDING PAGE
 ====================================== */
 
-.nav {
-  position: absolute;
-  top: 30px;
-  right: 5%;
-  z-index: 10;
-}
-
-.nav-label {
-  font-size: 10px;
-  letter-spacing: .22em;
-  color: #858B9B;
-}
+/* The top-right "INTERACTIVE INSTALLATION / V2C" label was removed to
+   open up the empty space at the top of the landing page. */
 
 .welcome {
   position: absolute;
@@ -149,13 +139,25 @@ body.round-discover .countdown-caption {
   width: 46%;
   position: relative;
   z-index: 2;
+
+  /* Holds the space the eyebrow used to occupy in the flow, so moving
+     it to the top-left does not shift anything below it. */
+  padding-top: 42px;
 }
 
+/* Pinned to the top-left of the screen so it lines up with the QR
+   heading. It is no longer part of .intro's flow — .intro's padding-top
+   below keeps the title, details and button exactly where they were. */
 .eyebrow {
+  position: absolute;
+  top: 32px;
+  left: 5%;
+  z-index: 10;
+
   font-size: 11px;
   letter-spacing: .32em;
   color: #737A8C;
-  margin-bottom: 28px;
+  margin: 0;
 }
 
 h1 {
@@ -245,21 +247,33 @@ h1 {
    QR CODES
 ====================================== */
 
-.qr-layer {
+/* One absolutely-positioned column holds the heading, the QR codes and
+   the instruction guide. Everything inside stacks in normal flow, so
+   the guide can never cover the codes or their labels at any size. */
+.lobby-panel {
   position: absolute;
 
-  top: 45%;
+  top: 32px;
   right: 5%;
-
-  transform:
-    translateY(-50%);
 
   width: 48%;
 
   z-index: 8;
 
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: stretch;
+
+  gap: 24px;
+}
+
+.qr-layer {
+  position: static;
+
+  width: 100%;
+
+  display: flex;
+  justify-content: space-between;
   align-items: flex-start;
 
   gap:
@@ -313,10 +327,7 @@ h1 {
 }
 
 .qr-heading {
-  position: absolute;
-
-  top: -70px;
-  left: 0;
+  position: static;
 
   width: 100%;
 
@@ -334,19 +345,20 @@ h1 {
 ====================================== */
 
 .instructions {
-  position: absolute;
-  bottom: 68px;
-  right: 5%;
-  width: 48%;
-  z-index: 9;
+  position: static;
+
+  width: 100%;
+
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
+  align-items: center;
+
+  gap: 8px;
 }
 
 .scoop-guide {
   width: 100%;
+  max-width: 720px;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,.75);
   border-radius: 15px;
@@ -362,6 +374,7 @@ h1 {
 }
 
 .lobby-status {
+  width: 100%;
   text-align: center;
   font-size: 11px;
   color: #74798A;
@@ -712,11 +725,10 @@ h1 {
 ====================================== */
 
 body.playing .welcome,
-body.playing .nav,
+body.playing .eyebrow,
 body.playing .footer,
 body.playing #preview,
-body.playing .qr-layer,
-body.playing .instructions {
+body.playing .lobby-panel {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -804,6 +816,19 @@ body.playing .exhibition {
     opacity: .3;
   }
 
+  .lobby-panel {
+    position: relative;
+
+    top: auto;
+    right: auto;
+
+    width: 100%;
+
+    margin-top: 75px;
+
+    gap: 24px;
+  }
+
   .qr-layer {
     position: relative;
 
@@ -814,8 +839,6 @@ body.playing .exhibition {
 
     width: 100%;
 
-    margin-top: 75px;
-
     gap: 28px;
   }
 
@@ -824,7 +847,6 @@ body.playing .exhibition {
   }
 
   .qr-heading {
-    top: -50px;
     font-size: 9px;
   }
 
@@ -837,7 +859,7 @@ body.playing .exhibition {
     width: 90%;
 
     margin:
-      30px auto 45px;
+      6px auto 45px;
   }
 
   .footer {
@@ -890,19 +912,13 @@ body.playing .exhibition {
 
   <!-- LANDING PAGE -->
 
-  <header class="nav">
-    <div class="nav-label">
-      INTERACTIVE INSTALLATION / V2C
-    </div>
-  </header>
+  <div class="eyebrow">
+    COLLECTIVE GENERATIVE ART
+  </div>
 
   <section class="welcome">
 
     <div class="intro">
-
-      <div class="eyebrow">
-        COLLECTIVE GENERATIVE ART
-      </div>
 
       <h1>
         Scoop<br>
@@ -937,59 +953,63 @@ body.playing .exhibition {
 
   <canvas id="preview"></canvas>
 
-  <!-- QR CODES -->
+  <!-- QR CODES + INSTRUCTION GUIDE
+       One column in normal flow: heading, codes, guide, status.
+       Nothing can overlap anything else at any screen size. -->
 
-  <div class="qr-layer">
+  <div class="lobby-panel">
 
     <div class="qr-heading">
       CHOOSE HOW YOU WANT TO PLAY
       WITH THE ARTWORK
     </div>
 
-    <div class="qr-player">
+    <div class="qr-layer">
 
-      <div class="qr-frame">
-        <div
-          class="qr-code"
-          id="qrCreate"
-        ></div>
+      <div class="qr-player">
+
+        <div class="qr-frame">
+          <div
+            class="qr-code"
+            id="qrCreate"
+          ></div>
+        </div>
+
+        <strong>CREATE</strong>
+        <span>Scoop to build</span>
+
       </div>
 
-      <strong>CREATE</strong>
-      <span>Scoop to build</span>
+      <div class="qr-player">
 
-    </div>
+        <div class="qr-frame">
+          <div
+            class="qr-code"
+            id="qrDisrupt"
+          ></div>
+        </div>
 
-    <div class="qr-player">
+        <strong>DISRUPT</strong>
+        <span>Move to erase</span>
 
-      <div class="qr-frame">
-        <div
-          class="qr-code"
-          id="qrDisrupt"
-        ></div>
       </div>
 
-      <strong>DISRUPT</strong>
-      <span>Move to erase</span>
-
     </div>
 
-  </div>
+    <div class="instructions">
+      <div class="scoop-guide">
+        <img
+          src="./assets/Instructional-Guide-1.png"
+          alt="Three-step scoop gesture: hold the phone horizontally with a finger on the screen, scoop downward, then lift the phone back up without releasing your finger."
+          draggable="false"
+        >
+      </div>
 
-  <!-- SHARED SCOOP INSTRUCTION GUIDE (BOTH ROLES) -->
-
-  <div class="instructions">
-    <div class="scoop-guide">
-      <img
-        src="./assets/Instructional-Guide-1.png"
-        alt="Three-step scoop gesture: hold the phone horizontally with a finger on the screen, scoop downward, then lift the phone back up without releasing your finger."
-        draggable="false"
-      >
+      <div class="lobby-status" id="lobbyStatus">
+        Scan a QR code to join.
+      </div>
     </div>
 
-    <div class="lobby-status" id="lobbyStatus">
-      Scan a QR code to join.
-    </div>
   </div>
 
   <!-- LIVE EXHIBITION -->
