@@ -75,6 +75,41 @@ const PALETTE = [
   [222, 185, 202]
 ];
 
+// Fragments stay dark charcoal with a strong cyan glow in BOTH rounds.
+// They were hard to track in Playtest 1, so their look never changes —
+// only the artwork palette and background differ per round.
+const FRAGMENT_COLOR = [40, 44, 52];
+const FRAGMENT_GLOW =
+  "rgba(64, 224, 255, .95)";
+
+// Cyan outline. Charcoal alone disappears against the Round 1 black
+// background, so the silhouette is always edged in cyan.
+const FRAGMENT_EDGE = [64, 224, 255];
+
+// Everything that differs between the lobby and the two rounds lives
+// in one block. The lobby and Round 2 share the original light-grey
+// background, so they only differ in name.
+const THEMES = {
+  lobby: {
+    background: [233, 234, 240],
+    hud: null
+  },
+
+  1: {
+    background: [0, 0, 0],
+    hud: [226, 233, 240]
+  },
+
+  2: {
+    background: [233, 234, 240],
+    hud: null
+  }
+};
+
+// Read only while Round 1 runs, so Round 2 and the lobby keep their
+// original grey HUD text exactly as it was.
+let hudOverride = null;
+
 // ========================================
 // NETWORK
 // ========================================
@@ -145,6 +180,10 @@ const spentFragmentIds = new Set();
 let gamePhase = "lobby";
 let playerReady = false;
 let roundId = null;
+
+// 1 = Discover (practice), 2 = Compete. The display decides this and
+// sends it on every game event; this phone only follows.
+let currentRound = 1;
 
 let roundEndsAt = 0;
 let countdownEndsAt = 0;
@@ -235,7 +274,7 @@ function draw() {
     }
 
     noStroke();
-    fill(52, 59, 77);
+    fill(...(hudOverride || [52, 59, 77]));
     textAlign(CENTER, CENTER);
     textSize(17);
 
@@ -285,7 +324,7 @@ function draw() {
 
     if (fragments.length === 0) {
       noStroke();
-      fill(100, 106, 123);
+      fill(...(hudOverride || [100, 106, 123]));
       textAlign(CENTER, CENTER);
       textSize(18);
 
@@ -640,6 +679,31 @@ function updateGameOverlay() {
 }
 
 // ========================================
+// ROUND THEME
+// ========================================
+
+function applyTheme(key) {
+  const theme = THEMES[key] || THEMES.lobby;
+
+  ART.background = theme.background;
+
+  hudOverride = theme.hud;
+}
+
+// The display is the authority on which round is running. Every game
+// event carries roundNumber, so a phone that joins late still lands on
+// the right background.
+function applyRoundTheme(roundNumber) {
+  const round = Number(roundNumber);
+
+  if (Number.isFinite(round) && THEMES[round]) {
+    currentRound = round;
+  }
+
+  applyTheme(currentRound);
+}
+
+// ========================================
 // SHARED EVENTS
 // ========================================
 
@@ -675,7 +739,15 @@ function shareEvent(name, data, from) {
 
 function beginCountdown(data) {
   roundId = data.roundId ?? roundId;
+
+  applyRoundTheme(data.roundNumber);
+
   gamePhase = "countdown";
+
+  // Round 1's fragments must not survive into Round 2, so drop them at
+  // the transition rather than three seconds later when the new round
+  // begins. The display clears its copy at the same moment.
+  fragments = [];
 
   countdownEndsAt = Date.now() +
     (Number.isFinite(Number(data.countdownMs))
@@ -691,6 +763,7 @@ function beginCountdown(data) {
 
 function beginGame(data) {
   roundId = data.roundId ?? roundId;
+  applyRoundTheme(data.roundNumber);
   gamePhase = "playing";
   gameWinner = null;
 
@@ -758,6 +831,8 @@ function synchronizeGame(data) {
   ) {
     return;
   }
+
+  applyRoundTheme(data.roundNumber);
 
   if (gamePhase !== "playing") return;
 
@@ -835,6 +910,12 @@ function finishGame(data) {
 
 function resetGame() {
   gamePhase = "lobby";
+
+  // Back to a fresh session: the next game starts at Round 1 and the
+  // phone returns to the original light-grey lobby look.
+  currentRound = 1;
+  applyTheme("lobby");
+
   roundId = null;
   playerReady = false;
   gameWinner = null;
@@ -1187,14 +1268,22 @@ function updateScoopGesture() {
 function addScoop() {
   if (gamePhase !== "playing") return;
 
+  // One fragment at a time, in both rounds: a new one can only be
+  // released after the current fragment has expired or been destroyed.
+  // The display removes destroyed fragments and sends fragment-hit,
+  // which clears this phone's copy, so the path back is automatic.
+  const now = millis();
+
+  const active = fragments.some(
+    f => now < f.expiresAt && !spentFragmentIds.has(f.id)
+  );
+
+  if (active) return;
+
   totalScoops++;
   playScoopTone();
 
   fragments.push(createFragment());
-
-  while (fragments.length > ART.maxFragments) {
-    fragments.shift();
-  }
 
   emitDisrupt("spawn", {
     fragments: getNetworkFragments()
@@ -1227,7 +1316,7 @@ function createFragment() {
       0.012
     ),
 
-    color: [...random(PALETTE)],
+    color: [...FRAGMENT_COLOR],
     shape: floor(random(4)),
 
     createdAt: now,
@@ -1561,6 +1650,12 @@ function drawFragment(f) {
   const c = f.color;
   const s = f.size * 0.65;
 
+  // Cyan halo, matching the shared display. p5 hands the native canvas
+  // over through drawingContext, and the pop() at the end of this
+  // function clears both the shadow and the transform again.
+  drawingContext.shadowColor = FRAGMENT_GLOW;
+  drawingContext.shadowBlur = max(16, s * 0.75) * opacity;
+
   fill(
     c[0],
     c[1],
@@ -1569,10 +1664,10 @@ function drawFragment(f) {
   );
 
   stroke(
-    min(255, c[0] + 25),
-    min(255, c[1] + 25),
-    min(255, c[2] + 25),
-    180 * opacity
+    FRAGMENT_EDGE[0],
+    FRAGMENT_EDGE[1],
+    FRAGMENT_EDGE[2],
+    210 * opacity
   );
 
   strokeWeight(0.8);
@@ -1659,7 +1754,7 @@ function mouseReleased() {
 
 function drawDebug() {
   noStroke();
-  fill(85, 92, 110);
+  fill(...(hudOverride || [85, 92, 110]));
   textSize(12);
   textAlign(LEFT, TOP);
 
@@ -1727,7 +1822,7 @@ function drawDebug() {
 
 function drawInstructions() {
   noStroke();
-  fill(105, 110, 125);
+  fill(...(hudOverride || [105, 110, 125]));
   textSize(12);
   textAlign(CENTER, CENTER);
 

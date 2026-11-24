@@ -74,6 +74,43 @@ button {
     );
 }
 
+/* ROUND 1 VEIL
+   A gradient cannot transition to a flat colour, so the pure black
+   background fades in over the existing one instead. It sits at
+   z-index 0 — above the background, below every positioned layer —
+   so artworks, HUD text and overlays all stay visible on top. */
+.screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+
+  z-index: 0;
+
+  background: #000000;
+  opacity: 0;
+
+  transition: opacity .9s ease;
+
+  pointer-events: none;
+}
+
+body.round-discover .screen::before {
+  opacity: 1;
+}
+
+/* Keep the countdown legible while the screen is black. */
+body.round-discover .countdown-overlay {
+  background: rgba(0, 0, 0, .78);
+}
+
+body.round-discover .countdown-number {
+  color: #FFFFFF;
+}
+
+body.round-discover .countdown-caption {
+  color: #6FE9FF;
+}
+
 /* ======================================
    LANDING PAGE
 ====================================== */
@@ -1059,7 +1096,10 @@ body.playing .exhibition {
       3
     </div>
 
-    <div class="countdown-caption">
+    <div
+      class="countdown-caption"
+      id="countdownCaption"
+    >
       GET READY
     </div>
 
@@ -1182,8 +1222,38 @@ const GAME = {
 
   spawnProtectionMs: 1000,
 
-  maxArtworks: 24
+  maxArtworks: 24,
+
+  soundVolume: 0.04
 };
+
+// ========================================
+// ROUNDS
+// ========================================
+
+// One setting block drives both rounds. Every rule that differs between
+// them lives here; the round logic itself stays in the single existing
+// game flow rather than being copied per round.
+const ROUNDS = {
+  1: {
+    label: "ROUND 1 · DISCOVER",
+    roundMs: 30000,
+    practice: true
+  },
+  2: {
+    label: "ROUND 2 · COMPETE",
+    roundMs: 30000,
+    practice: false
+  }
+};
+
+// Cyan glow shared by DISRUPT fragments in both rounds. The edge
+// keeps the dark silhouette readable against a black background.
+const FRAGMENT_GLOW =
+  "rgba(64, 224, 255, .95)";
+
+const FRAGMENT_EDGE =
+  [64, 224, 255];
 
 const MAX_LAYERS = 24;
 const FADE_LAYERS = 10;
@@ -1291,6 +1361,11 @@ const countdownNumber =
     "countdownNumber"
   );
 
+const countdownCaption =
+  document.getElementById(
+    "countdownCaption"
+  );
+
 const endOverlay =
   document.getElementById(
     "endOverlay"
@@ -1345,6 +1420,10 @@ let gamePhase = "lobby";
 let gameArmed = false;
 
 let roundId = null;
+
+// 1 = Discover (practice), 2 = Compete. The display is the authority for
+// which round is running; both phones follow the roundNumber it sends.
+let currentRound = 1;
 
 let countdownEndsAt = 0;
 let roundEndsAt = 0;
@@ -1516,11 +1595,38 @@ function tryStartCountdown() {
 }
 
 // ========================================
+// ROUND SETTINGS + THEME
+// ========================================
+
+function currentRoundSettings() {
+  return ROUNDS[currentRound] || ROUNDS[1];
+}
+
+function isPracticeRound() {
+  return currentRoundSettings().practice === true;
+}
+
+// Round 1 is pure black. The lobby and Round 2 keep the original
+// light-grey background, so the class is only present while Round 1
+// is actually running.
+function applyRoundTheme() {
+  document.body.classList.toggle(
+    "round-discover",
+    gamePhase !== "lobby" && currentRound === 1
+  );
+}
+
+// ========================================
 // GAME COUNTDOWN
 // ========================================
 
 function startCountdown() {
   gamePhase = "countdown";
+
+  countdownCaption.textContent =
+    currentRoundSettings().label;
+
+  applyRoundTheme();
 
   roundId =
     "round-" +
@@ -1555,6 +1661,9 @@ function startCountdown() {
 
   emitGame("game-countdown", {
     roundId,
+
+    roundNumber: currentRound,
+
     countdownMs:
       GAME.countdownMs
   });
@@ -1567,18 +1676,32 @@ function startCountdown() {
 function startRound() {
   gamePhase = "playing";
 
+  // Keeps the background matched to the round even if the countdown
+  // that normally precedes this was skipped.
+  applyRoundTheme();
+
   const now =
     Date.now();
 
+  const settings =
+    currentRoundSettings();
+
   roundEndsAt =
-    now + GAME.roundMs;
+    now + settings.roundMs;
 
-  // CREATE gets 5 seconds to
-  // produce the first artwork.
-  recoveryEndsAt =
-    now + GAME.recoveryMs;
+  // Practice rounds disable the recovery rule entirely: CREATE can
+  // never lose on the clock. Round 2 restores the original rule.
+  if (settings.practice) {
+    recoveryEndsAt = 0;
+    recoveryStarted = false;
+  } else {
+    // CREATE gets 5 seconds to
+    // produce the first artwork.
+    recoveryEndsAt =
+      now + GAME.recoveryMs;
 
-  recoveryStarted = true;
+    recoveryStarted = true;
+  }
 
   countdownOverlay.style.display =
     "none";
@@ -1587,11 +1710,16 @@ function startRound() {
 
   emitGame("game-start", {
     roundId,
+
+    roundNumber: currentRound,
+
     remainingMs:
-      GAME.roundMs,
+      settings.roundMs,
 
     recoveryRemainingMs:
-      GAME.recoveryMs
+      settings.practice
+        ? 0
+        : GAME.recoveryMs
   });
 
   sendGameState();
@@ -1612,6 +1740,8 @@ function sendGameState() {
 
   emitGame("game-state", {
     roundId,
+
+    roundNumber: currentRound,
 
     phase: "playing",
 
@@ -2142,6 +2272,12 @@ function notifyArtworkRemoved(
   artwork,
   reason = "collision"
 ) {
+  // Only a DISRUPT hit is a destruction. The layer cap rotates old
+  // artwork out and stays silent.
+  if (reason === "collision") {
+    playDestructionTone();
+  }
+
   emitGame("artwork-erased", {
     roundId,
 
@@ -2348,6 +2484,11 @@ function beginRecovery() {
     return;
   }
 
+  // Practice rounds never run the recovery rule.
+  if (isPracticeRound()) {
+    return;
+  }
+
   if (
     recoveryEndsAt > 0
   ) {
@@ -2367,6 +2508,17 @@ function updateRecovery(now) {
   if (
     gamePhase !== "playing"
   ) {
+    recoveryMessage.style.display =
+      "none";
+
+    return;
+  }
+
+  // Practice rounds have no recovery countdown and can never end
+  // through it, so the HUD stays hidden for the full 30 seconds.
+  if (isPracticeRound()) {
+    recoveryEndsAt = 0;
+    recoveryStarted = false;
     recoveryMessage.style.display =
       "none";
 
@@ -2535,11 +2687,19 @@ function updateGame(now) {
       )
     ).padStart(2, "0");
 
-  // The 30-second limit
-  // determines the winner.
+  // The 30-second limit ends the
+  // round. A practice round always
+  // runs its full length and moves on
+  // without a winner; Round 2 decides
+  // one.
   if (
     remaining <= 0
   ) {
+    if (isPracticeRound()) {
+      advanceRound();
+      return;
+    }
+
     finishGame(
       sharedArtworks.length > 0
         ? "create"
@@ -2566,6 +2726,26 @@ function updateGame(now) {
 }
 
 // ========================================
+// ROUND TRANSITION
+// ========================================
+
+// End of Round 1. No winner is declared and no result screen is shown.
+function advanceRound() {
+  currentRound = 2;
+
+  // Fades the black veil back out to the original light-grey
+  // background while the countdown is still on screen.
+  applyRoundTheme();
+
+  // startCountdown() clears the Round 1 artworks and fragments, mints a
+  // fresh roundId and runs the existing three-second countdown, which
+  // emits game-countdown and then game-start. Both phones already reset
+  // their local state on those events, so the transition stays in sync
+  // with no new event type and no second game loop.
+  startCountdown();
+}
+
+// ========================================
 // CLEAR AND RESET
 // ========================================
 
@@ -2587,6 +2767,11 @@ function resetGame() {
   });
 
   gamePhase = "lobby";
+
+  // Back to a fresh session: the next game starts at Round 1.
+  currentRound = 1;
+
+  applyRoundTheme();
 
   gameArmed = false;
 
@@ -3278,6 +3463,13 @@ function drawDisruptFragment(
   ctx.translate(x, y);
   ctx.rotate(f.rotation);
 
+  // Strong cyan halo. Fragments were hard to track in Playtest 1, so
+  // they glow in both rounds. save()/restore() below clears the shadow.
+  ctx.shadowColor = FRAGMENT_GLOW;
+
+  ctx.shadowBlur =
+    Math.max(16, s * .75) * opacity;
+
   ctx.fillStyle =
     rgba(
       c,
@@ -3286,14 +3478,9 @@ function drawDisruptFragment(
 
   ctx.strokeStyle =
     rgba(
-      c.map(
-        v => Math.min(
-          255,
-          v + 25
-        )
-      ),
+      FRAGMENT_EDGE,
 
-      .7 * opacity
+      .85 * opacity
     );
 
   ctx.lineWidth = .8;
@@ -3546,12 +3733,118 @@ function animate(time) {
 }
 
 // ========================================
+// AUDIO
+// ========================================
+
+// Built and resumed inside the click handlers below, so audio only ever
+// starts from a real user gesture — the browser autoplay rule, and the
+// same approach the phones already use.
+let audioContext = null;
+
+function unlockGameAudio() {
+  try {
+    const AudioContextClass =
+      window.AudioContext ||
+      window.webkitAudioContext;
+
+    if (!AudioContextClass) {
+      return;
+    }
+
+    if (!audioContext) {
+      audioContext =
+        new AudioContextClass();
+    }
+
+    if (
+      audioContext.state === "suspended"
+    ) {
+      audioContext.resume();
+    }
+  } catch (error) {
+    console.warn(
+      "Audio unavailable:",
+      error
+    );
+  }
+}
+
+function playSoftNote(
+  frequency,
+  start,
+  duration,
+  volume
+) {
+  if (!audioContext) return;
+
+  if (
+    audioContext.state !== "running"
+  ) {
+    audioContext.resume();
+  }
+
+  const oscillator =
+    audioContext.createOscillator();
+
+  const gain =
+    audioContext.createGain();
+
+  oscillator.type = "sine";
+
+  oscillator.frequency.setValueAtTime(
+    frequency,
+    start
+  );
+
+  gain.gain.setValueAtTime(
+    0.0001,
+    start
+  );
+
+  gain.gain.exponentialRampToValueAtTime(
+    volume,
+    start + 0.025
+  );
+
+  gain.gain.exponentialRampToValueAtTime(
+    0.0001,
+    start + duration
+  );
+
+  oscillator.connect(gain);
+  gain.connect(audioContext.destination);
+
+  oscillator.start(start);
+  oscillator.stop(
+    start + duration + 0.02
+  );
+}
+
+// A short, quiet fall. This is the shared cue that a fragment
+// destroyed an artwork — deliberately different from the brighter
+// rising scoop tones on the phones.
+function playDestructionTone() {
+  if (!audioContext) return;
+
+  const now =
+    audioContext.currentTime;
+
+  const volume =
+    GAME.soundVolume;
+
+  playSoftNote(294.00, now, 0.14, volume);
+  playSoftNote(220.00, now + 0.07, 0.20, volume);
+}
+
+// ========================================
 // BUTTONS
 // ========================================
 
 startButton.addEventListener(
   "click",
   () => {
+    unlockGameAudio();
+
     gameArmed = true;
 
     updateLobbyStatus();
@@ -3571,7 +3864,13 @@ document.getElementById(
   "playAgainButton"
 ).addEventListener(
   "click",
-  resetGame
+  () => {
+    // iOS can pause audio while the page is hidden, so re-arm it on
+    // the way back into a session.
+    unlockGameAudio();
+
+    resetGame();
+  }
 );
 
 // ========================================

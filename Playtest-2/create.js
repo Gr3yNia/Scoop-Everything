@@ -62,6 +62,49 @@ const PALETTE = [
   [177, 159, 193]
 ];
 
+// Round 1 (Discover) artwork colours: cyan, turquoise, lime, lavender
+// and a near-white highlight. Only the colours change — the kaleidoscope
+// shapes and their movement come from ART and are untouched.
+const PRACTICE_PALETTE = [
+  [ 64, 224, 255], // cyan
+  [  0, 206, 209], // turquoise
+  [154, 240,  88], // lime
+  [196, 180, 255], // lavender
+  [245, 252, 255], // white highlight
+  [120, 255, 224], // mint
+  [140, 190, 255]  // sky
+];
+
+// Everything that differs between the lobby and the two rounds lives
+// in one block. The lobby and Round 2 share the original light-grey
+// look, so they only differ in name.
+const THEMES = {
+  lobby: {
+    background: [233, 234, 240],
+    palette: PALETTE,
+    hud: null
+  },
+
+  1: {
+    background: [0, 0, 0],
+    palette: PRACTICE_PALETTE,
+    hud: [226, 233, 240]
+  },
+
+  2: {
+    background: [233, 234, 240],
+    palette: PALETTE,
+    hud: null
+  }
+};
+
+// Read only while Round 1 runs, so Round 2 and the lobby keep their
+// original grey HUD text exactly as it was.
+let hudOverride = null;
+
+// Which round's colours to draw new artworks with.
+let artworkPalette = PALETTE;
+
 const SHARE_HOST =
   "https://p5-phone-share.npuckett.workers.dev";
 
@@ -96,6 +139,10 @@ let nextArtworkId = 1;
 
 let gamePhase = "lobby";
 let playerReady = false;
+
+// 1 = Discover (practice), 2 = Compete. The display decides this and
+// sends it on every game event; this phone only follows.
+let currentRound = 1;
 
 let roundId = null;
 let roundEndsAt = 0;
@@ -192,7 +239,7 @@ function draw() {
     }
 
     noStroke();
-    fill(52, 59, 77);
+    fill(...(hudOverride || [52, 59, 77]));
     textSize(17);
     textAlign(CENTER, CENTER);
 
@@ -232,7 +279,7 @@ function draw() {
     kaleidoscopes.length === 0
   ) {
     noStroke();
-    fill(100, 106, 123);
+    fill(...(hudOverride || [100, 106, 123]));
     textSize(18);
     textAlign(CENTER, CENTER);
 
@@ -566,6 +613,38 @@ function updateGameOverlay() {
 }
 
 // ========================================
+// ROUND THEME
+// ========================================
+
+function applyTheme(key) {
+  const theme =
+    THEMES[key] || THEMES.lobby;
+
+  ART.background = theme.background;
+
+  artworkPalette = theme.palette;
+
+  hudOverride = theme.hud;
+}
+
+// The display is the authority on which round is running. Every game
+// event carries roundNumber, so a phone that joins late still lands on
+// the right background and colours.
+function applyRoundTheme(roundNumber) {
+  const round =
+    Number(roundNumber);
+
+  if (
+    Number.isFinite(round) &&
+    THEMES[round]
+  ) {
+    currentRound = round;
+  }
+
+  applyTheme(currentRound);
+}
+
+// ========================================
 // NETWORK EVENTS
 // ========================================
 
@@ -605,6 +684,8 @@ function shareEvent(name, data, from) {
 function beginCountdown(data) {
   roundId = data.roundId ?? roundId;
 
+  applyRoundTheme(data.roundNumber);
+
   gamePhase = "countdown";
 
   countdownEndsAt =
@@ -624,6 +705,8 @@ function beginCountdown(data) {
 function beginGame(data) {
   roundId = data.roundId ?? roundId;
 
+  applyRoundTheme(data.roundNumber);
+
   gamePhase = "playing";
 
   roundEndsAt =
@@ -633,10 +716,16 @@ function beginGame(data) {
 
   countdownEndsAt = 0;
 
+  // A practice round sends recoveryRemainingMs: 0 to switch the rule
+  // off. Testing the value matters here — `||` would turn that 0 into
+  // the default five seconds and put the recovery HUD back on screen.
+  const recovery =
+    Number(data.recoveryRemainingMs);
+
   recoveryEndsAt =
-    Date.now() +
-    (Number(data.recoveryRemainingMs) ||
-      GAME.recoveryMs);
+    Number.isFinite(recovery) && recovery > 0
+      ? Date.now() + recovery
+      : 0;
 
   kaleidoscopes = [];
   totalScoops = 0;
@@ -656,6 +745,8 @@ function synchronizeGame(data) {
   ) {
     return;
   }
+
+  applyRoundTheme(data.roundNumber);
 
   if (gamePhase !== "playing") {
     return;
@@ -747,6 +838,11 @@ function finishGame(data) {
 
 function resetGame() {
   gamePhase = "lobby";
+
+  // Back to a fresh session: the next game starts at Round 1 and the
+  // phone returns to the original light-grey lobby look.
+  currentRound = 1;
+  applyTheme("lobby");
 
   roundId = null;
   playerReady = false;
@@ -1285,7 +1381,7 @@ function createKaleidoscope() {
 
   for (let i = 0; i < 4; i++) {
     colors.push([
-      ...random(PALETTE)
+      ...random(artworkPalette)
     ]);
   }
 
@@ -1832,7 +1928,7 @@ function drawDebugReadout() {
   push();
 
   noStroke();
-  fill(85, 92, 110);
+  fill(...(hudOverride || [85, 92, 110]));
 
   textSize(12);
   textAlign(LEFT, TOP);
@@ -1903,7 +1999,7 @@ function drawInstruction() {
   push();
 
   noStroke();
-  fill(105, 110, 125);
+  fill(...(hudOverride || [105, 110, 125]));
 
   textSize(12);
   textAlign(CENTER, CENTER);
