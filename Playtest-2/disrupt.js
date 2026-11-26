@@ -1411,18 +1411,11 @@ function updateScoopGesture() {
 function addScoop() {
   if (gamePhase !== "playing") return;
 
-  // One fragment at a time, in both rounds: a new one can only be
-  // released after the current fragment has expired or been destroyed.
-  // The display removes destroyed fragments and sends fragment-hit,
-  // which clears this phone's copy, so the path back is automatic.
-  const now = millis();
-
-  const active = fragments.some(
-    f => now < f.expiresAt && !spentFragmentIds.has(f.id)
-  );
-
-  if (active) return;
-
+  // Exactly one fragment per scoop, with no cap on how many can be
+  // active at once. Every fragment keeps its own 10-second lifetime and
+  // survives later scoops; the expiry filter in draw() removes them once
+  // they lapse, and the display drops them when a fragment-hit consumes
+  // one.
   totalScoops++;
   playScoopTone();
 
